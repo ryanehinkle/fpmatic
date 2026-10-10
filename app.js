@@ -1,4 +1,4 @@
-import {exportExactFloorPlan} from "./excel-export.js?v=20261010c";
+import {exportExactFloorPlan} from "./excel-export.js?v=20261010d";
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
 
@@ -318,54 +318,6 @@ async function importFiles(files){
     if(found===0)notify("No Manager Catering BEO events found. Please check the PDF.");
   }catch(err){console.error(err);notify("PDF parsing error: "+err.message)}
   finally{$("newUpload").disabled=false;$("pdfInput").value=""}
-}
-function colName(n){let s="";while(n>0){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26)}return s}
-function cellName(col,row){return colName(col)+row}
-function baseStyle(fill,opts={}){
-  return {fill:{patternType:"solid",fgColor:{rgb:fill.replace("#","")}},font:{name:"Arial",sz:opts.sz||10,bold:opts.bold!==false,color:{rgb:(opts.fontColor||"#191919").replace("#","")}},alignment:{horizontal:"center",vertical:"center",wrapText:true, ...(opts.rotate?{textRotation:90}:{})},border:{top:{style:"thin",color:{rgb:"ADB1B7"}},bottom:{style:"thin",color:{rgb:"ADB1B7"}},left:{style:"thin",color:{rgb:"ADB1B7"}},right:{style:"thin",color:{rgb:"ADB1B7"}}}};
-}
-function setCell(ws,address,value,style){ws[address]={t:typeof value==="number"?"n":"s",v:value,s:style};}
-function merge(ws,start,end){ws["!merges"].push({s:{c:start[0]-1,r:start[1]-1},e:{c:end[0]-1,r:end[1]-1}})}
-function paintMerged(ws,c1,r1,c2,r2,label,style){
-  for(let y=r1;y<=r2;y++)for(let x=c1;x<=c2;x++)setCell(ws,cellName(x,y),x===c1&&y===r1?label:"",style);
-  if(c1!==c2||r1!==r2)merge(ws,[c1,r1],[c2,r2]);
-}
-function buildTemplate(){
-  const wb=XLSX.utils.book_new();
-  const white=baseStyle("#FFFFFF",{sz:8}),pale=baseStyle("#F1F1F1",{sz:9});
-  const yellow=baseStyle("#FFFF00",{sz:8}),label=baseStyle("#E4E4E4",{sz:12}), orange=baseStyle("#FFB35D",{sz:10}),peach=baseStyle("#E6B8AF",{sz:8});
-  for(const day of DAYS){
-    const ws=XLSX.utils.aoa_to_sheet([]);
-    ws["!merges"]=[];ws["!cols"]=Array.from({length:70},(_,i)=>({wch:i===3?5:i>=4&&i<=37?4.2:7}));
-    ws["!rows"]=Array.from({length:56},()=>({hpt:22}));
-    ws["!pageSetup"]={orientation:"landscape",fitToWidth:1,fitToHeight:1};
-    for(const [floor,header,am,pm,second] of [[3,3,4,9,14],[2,19,20,25,30],[1,35,36,41,46]]){
-      for(const row of [header,second])for(let b=1;b<=34;b++){
-        const no=floor*100+b;setCell(ws,cellName(b+4,row),no,couch(floor,no)?yellow:neutral(floor,no)?pale:white);
-      }
-      for(let y=am;y<am+10;y++)for(let x=5;x<=38;x++)setCell(ws,cellName(x,y),"",white);
-      paintMerged(ws,4,am,4,am+4,"AM",label);paintMerged(ws,4,pm,4,pm+4,"PM",label);
-      const titleRow={3:1,2:17,1:33}[floor];
-      paintMerged(ws,39,titleRow,39,titleRow+15,{1:"FIRST FLOOR",2:"SECOND FLOOR",3:"THIRD FLOOR"}[floor],label);
-    }
-    paintMerged(ws,13,1,18,1,"Terrace",orange);
-    paintMerged(ws,21,1,22,1,"DOORS",peach);
-    paintMerged(ws,29,1,36,1,"Upper Lounge",orange);
-    paintMerged(ws,11,17,14,17,"Sig North",orange);
-    paintMerged(ws,15,17,18,17,"Sig South",orange);
-    paintMerged(ws,13,33,26,33,"3 Heater Bays",baseStyle("#E06666"));
-    paintMerged(ws,28,33,31,33,"Lower Lounge",orange);
-    setCell(ws,"A1","MOD's",label);setCell(ws,"A17","MOD's",label);setCell(ws,"A33","MOD's",label);
-    setCell(ws,"A48","AM Admin",pale);setCell(ws,"C48","PM Admin",pale);
-    for(const [c,labelName] of [[1,"On Deck"],[16,"Main Bar"],[31,"Terrace"]])setCell(ws,cellName(c,53),labelName,pale);
-    ws["!ref"]="A1:BM55";
-    XLSX.utils.book_append_sheet(wb,ws,day);
-  }
-  return wb;
-}
-function removeMasterPlots(ws){
-  // The uploaded master is intentionally blank. Remove only prior FPmatic event ranges if re-exporting.
-  if(!ws["!merges"])ws["!merges"]=[];
 }
 async function exportWorkbook(){
   if(!state.events.length)return;
