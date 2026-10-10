@@ -8,3 +8,42 @@ main{width:min(96vw,1680px);margin:0 auto;padding:34px 0 70px}.panel{background:
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0s!important;animation-duration:0s!important}}
 /* Keep bay headings/landmarks aligned with the event grid after its AM/PM gutter. */
 .floor-main>.bay-headers,.floor-main>.landmarks{margin-left:52px}
+
+
+/* Match the original Topgolf floor-plan spreadsheet at on-screen scale.
+   The master uses bold Calibri, pale AM blue / PM yellow, thin grey cells,
+   52.5-point working rows and the official event category fills. */
+.floor-boards{font-family:Calibri,"Carlito",Arial,Helvetica,sans-serif}
+.floor-board{gap:8px}
+.floor-title{font-family:Calibri,"Carlito",Arial,sans-serif;font-size:1.05rem;font-weight:700;letter-spacing:0;background:#fff;border:1px solid #222;color:#080808}
+.bay-no{height:22px;border:1px solid #8f8f8f;font-size:12px;font-weight:700;font-family:Calibri,"Carlito",Arial,sans-serif}
+.bay-no.couch{background:#FFFF00}
+.landmarks{height:19px;grid-auto-rows:19px}
+.landmark{font-family:Calibri,"Carlito",Arial,sans-serif;font-size:12px;font-weight:700;color:#111;background:#FF9900;border-color:#000}
+.landmark.doors{background:#E6B8AF;border-color:#111}
+.period-label{border:1px solid #292929;font-family:Calibri,"Carlito",Arial,sans-serif;font-size:1.4rem;font-weight:700;color:#000}
+.period-label.am{background:#CFE2F3}
+.period-label.pm{background:#FFF2CC}
+.event-grid{
+  grid-template-rows:repeat(5,36px);
+  background-color:#fff;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0, transparent calc(var(--bay-width) - 1px),#D9D9D9 calc(var(--bay-width) - 1px),#D9D9D9 var(--bay-width)),
+    repeating-linear-gradient(180deg,transparent 0,transparent 35px,#D9D9D9 35px,#D9D9D9 36px);
+  border-color:#222;
+}
+.event-plot{
+  font-family:Calibri,"Carlito",Arial,Helvetica,sans-serif;
+  color:#000;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.14;
+  letter-spacing:0;
+  border:0;
+  border-radius:0;
+  padding:3px 3px;
+}
+.event-plot .plot-name{font-size:13px}
+.event-plot.tentative{border:0}
+.event-plot.plot-compact,.event-plot.plot-compact .plot-name{font-size:11px;line-height:1.1}
+.event-plot>span{max-width:100%;overflow:hidden;text-overflow:clip;overflow-wrap:break-word}
