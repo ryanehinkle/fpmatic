@@ -255,7 +255,7 @@ function render(){
   const start=state.week,end=addDays(start,6),current=weeksEvents(),day=dayEvents();
   $("weekTitle").textContent=niceDate(start,{month:"long",day:"numeric"})+" – "+niceDate(end,{month:"long",day:"numeric",year:"numeric"});
   $("weekPickerLabel").textContent=niceDate(start)+" – "+niceDate(end);
-  $("fileSummary").textContent=state.files.length+" PDF"+(state.files.length===1?"":"s")+" · "+state.events.length+" imported event"+(state.events.length===1?"":"s");
+  $("fileSummary").textContent=state.files.length+" report"+(state.files.length===1?"":"s")+" · "+state.events.length+" events";
   const issues=allIssues(),layout=layoutDay(day),missing=current.filter(e=>validation(e).length>0).length;
   $("statEvents").textContent=current.length;
   $("statPlotted").textContent=current.filter(e=>baySegments(e.bays).length>0).length;
@@ -266,7 +266,7 @@ function render(){
     return '<button class="day-tab'+(state.day===i?" active":"")+'" data-day="'+i+'">'+x.slice(0,3)+'<small>'+niceDate(addDays(start,i),{month:"short",day:"numeric"})+' · '+n+'</small></button>';
   }).join("");
   $("dayHeading").textContent=DAYS[state.day]+" · "+niceDate(addDays(start,state.day),{month:"long",day:"numeric"});
-  $("daySubheading").textContent="3 floors · 102 bays · morning + evening sections";
+  $("daySubheading").textContent="102 bays · AM / PM";
   $("dayTotal").textContent=day.length+" event"+(day.length===1?"":"s");
   $("floorBoards").innerHTML=[3,2,1].map(f=>floorBoard(f,layout)).join("");
   const search=$("eventSearch").value.trim().toLowerCase(),f=$("eventFilter").value;
