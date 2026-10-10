@@ -421,8 +421,13 @@ async function exportWorkbook(){
   const fileStart=localDate(state.week),fileEnd=localDate(addDays(state.week,6));
   const formatFile=d=>pad(d.getMonth()+1)+"."+pad(d.getDate())+"."+String(d.getFullYear()).slice(2);
   const filename=formatFile(fileStart)+" - "+formatFile(fileEnd)+" Floorplan.xlsx";
-  XLSX.writeFile(wb,filename,{bookType:"xlsx",compression:true,cellStyles:true});
-  notify("Exporting "+filename+(issues.length?" · "+issues.length+" layout warning(s)":""));
+  try {
+    XLSX.writeFile(wb,filename,{bookType:"xlsx",compression:true,cellStyles:true});
+    notify("Downloading "+filename+(issues.length?" · "+issues.length+" layout warning(s)":""));
+  } catch(error) {
+    console.error("FPmatic Excel export failed:",error);
+    notify("Excel export failed: "+(error?.message||"unknown error"));
+  }
 }
 $("dropzone").addEventListener("click",()=>$("pdfInput").click());
 $("dropzone").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();$("pdfInput").click()}});
