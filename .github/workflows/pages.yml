@@ -24,7 +24,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Verify exact master export
-        run: node tests/export-master.test.cjs
+        run: node tests/floorplan-regression.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
