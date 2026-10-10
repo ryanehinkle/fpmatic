@@ -248,6 +248,7 @@ function floorBoard(floor,layout){
 }
 function render(){
   const has=state.events.length>0;
+  document.body.classList.toggle("is-landing",!has);
   $("intro").hidden=has;$("workspace").hidden=!has;$("export").disabled=!has;
   if(!has)return;
   if(!state.week)state.week=weekOf(state.events.find(e=>e.date)?.date||isoDate(new Date()));
