@@ -65,7 +65,7 @@ function recolorStyles(xml){
 
   const xfsMatch=xml.match(/<cellXfs\b[^>]*>[\s\S]*?<\/cellXfs>/);
   if(!xfsMatch)throw new Error("Invalid Excel master cell style table");
-  const originals=[...xfsMatch[0].matchAll(/<xf(?:\s[^>]*)?(?:\/>|>[\s\S]*?<\/xf>)/g)].map(x=>x[0]);
+  const originals=[...xfsMatch[0].matchAll(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g)].map(x=>x[0]);
   const created=[],cached=new Map();
 
   function setAttribute(tag,key,value){
