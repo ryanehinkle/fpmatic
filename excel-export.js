@@ -55,8 +55,8 @@ function recolorStyles(xml){
   });
   const styleIds={};
   xml=replaceSection(xml,"cellXfs",section=>{
-    const styles=[...section.matchAll(/<xf(?:\s[^>]*)?(?:\/>|>[\s\S]*?<\/xf>)/g)];
-    const start=styles.length;
+    const start=Number((section.match(/<cellXfs\b[^>]*count="(\d+)"/)||[])[1]);
+    if(!Number.isInteger(start)||start<1)throw new Error("Excel template style table is invalid");
     let additions="";
     let n=0;
     for(const [category,colors] of Object.entries(COLORS)){
