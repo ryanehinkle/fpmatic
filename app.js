@@ -29,7 +29,7 @@ function fmtRange(a,b){return fmtMin(clockMin(a))+"-"+fmtMin(clockMin(b))}
 function isPM(e){const a=clockMin(e.start),b=clockMin(e.end);return a!==null&&b!==null&&(a>=960||b>=1140)}
 function period(e){return isPM(e)?"PM":"AM"}
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function shortName(s){return String(s||"").replace(/\s+-\s+\d\d?[./-]\d\d?[./-]\d{2,4}\s*$/,"").trim()}
+function shortName(s){return String(s||"").replace(/\s*[-–]\s*\d\d?[./-]\d\d?[./-]\d{2,4}\s*$/,"").trim()}
 function displayLines(e){
   const out=[e.name||"Unnamed event",(e.space?e.space+" ":"")+fmtRange(e.start,e.end)];
   if(e.golfStart&&e.golfEnd&&(clockMin(e.golfStart)!==clockMin(e.start)||clockMin(e.golfEnd)!==clockMin(e.end)))out.push("Golf "+fmtRange(e.golfStart,e.golfEnd));
@@ -228,7 +228,7 @@ function renderPeriod(floor,part,recordList){
     const lines=displayLines(e);
     const tiny=r.range.end-r.range.start<3||r.height===2;
     const hasConflict=allIssues().some(i=>i.event.id===e.id&&i.msg.startsWith("Bay/time conflict"));
-    return '<button type="button" class="event-plot'+(tiny?" plot-compact":"")+(e.status==="Tentative"?" tentative":"")+(state.selection===e.id?" selected":"")+(hasConflict?" conflict":"")+'" data-event="'+escapeHtml(e.id)+'" title="'+escapeHtml(e.name+" | "+r.range.start+"-"+r.range.end+" | "+fmtRange(e.start,e.end))+'" style="grid-column:'+(r.range.start%100)+' / '+(r.range.end%100+1)+';grid-row:'+(r.row+1)+' / span '+r.height+';background:'+color(e)+'">'+lines.map((t,i)=>'<span'+(i===0?' class="plot-name"':'')+'>'+escapeHtml(t)+'</span>').join("")+'</button>';
+    return '<button type="button" class="event-plot'+(tiny?" plot-compact":"")+(e.status==="Tentative"?" tentative":"")+(state.selection===e.id?" selected":"")+(hasConflict?" conflict":"")+'" data-event="'+escapeHtml(e.id)+'" title="'+escapeHtml(e.name+" | "+r.range.start+"-"+r.range.end+" | "+fmtRange(e.start,e.end))+'" style="grid-column:'+(r.range.start%100)+' / '+(r.range.end%100+1)+';grid-row:'+(r.row+1)+' / span '+r.height+';background:'+color(e)+';color:'+(e.status==="Tentative"&&e.category!=="Pleaser"?"#fff":"#151515")+'">'+lines.map((t,i)=>'<span'+(i===0?' class="plot-name"':'')+'>'+escapeHtml(t)+'</span>').join("")+'</button>';
   }).join("");
   return '<div class="period-wrap"><div class="period-label">'+part+'</div><div class="event-grid">'+plots+'</div></div>';
 }
@@ -310,7 +310,7 @@ async function importFiles(files){
       if(!state.files.includes(file.name))state.files.push(file.name);
     }
     const dates=state.events.filter(e=>e.date).map(e=>e.date).sort();
-    if(dates.length)state.week=weekOf(dates[0]);
+    if(dates.length){const newDates=state.events.filter(e=>e.date&&all.some(f=>f.name===e.source)).map(e=>e.date).sort();state.week=weekOf(newDates[0]||dates[0]);}
     state.day=0;state.selection="";
     render();notify("Imported "+found+" BEO event"+(found===1?"":"s"));
     if(found===0)notify("No Manager Catering BEO events found. Please check the PDF.");
@@ -380,7 +380,7 @@ function exportWorkbook(){
       const startRow=({3:4,2:20,1:36}[rec.range.floor])+(period(e)==="PM"?5:0)+rec.row;
       const endRow=startRow+rec.height-1;
       const c1=4+rec.range.start%100,c2=4+rec.range.end%100;
-      const style=baseStyle(color(e),{sz:rec.height===2?9.5:10.5,fontColor:e.status==="Tentative"&&e.category==="Buffet"?"#FFFFFF":"#161616"});
+      const style=baseStyle(color(e),{sz:rec.height===2?9.5:10.5,fontColor:e.status==="Tentative"&&e.category!=="Pleaser"?"#FFFFFF":"#161616"});
       for(let y=startRow;y<=endRow;y++)for(let x=c1;x<=c2;x++)setCell(ws,cellName(x,y),"",style);
       const address=cellName(c1,startRow);
       setCell(ws,address,displayLines(e).join("\n"),style);
