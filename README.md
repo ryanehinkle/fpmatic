@@ -4,9 +4,13 @@ Topgolf Naperville event floor-plan generator. Static GitHub Pages app, styled t
 
 ## Usage
 
-Open https://ryanehinkle.github.io/fpmatic/ and upload one or more combined Manager Catering BEO PDF packets. The PDFs are processed **locally in the browser** using PDF.js; no backend, credentials, or PDF upload service is involved.
+Open https://ryanehinkle.github.io/fpmatic/.
 
-FPmatic extracts events, dates, times, guest counts, booking status, bay assignments, room/space information, and main food/package labels. It automatically plots the bay ranges for each of seven daily worksheets (Monday–Sunday), separated into floors and AM/PM sections. Click any event to correct parsed details. Events with missing/invalid bays remain in the event list for review; bay/time overlaps are flagged.
+**Main workflow:** Select the two Salesforce CSV exports, **Event Staffing** and **List of Catering Menus - Specific Date**, then click **Build floor plan**. The Event Staffing report is the authority for event records, dates, overall event times, bay ranges, guest counts, tentative/definite status, room products, and golf-only times. Catering Menus is matched on the full Opportunity Name to determine food packages and event colors. Duplicate product rows are grouped into one event; bookings without menu rows remain included. The parser flags events without assigned bays for review instead of estimating.
+
+There is also a small **Use BEO PDF instead** option, preserved as an alternative.
+
+All data stays in the browser. Imported report content is not transmitted to GitHub or any server. The selected report filenames and event records are persisted in browser local storage; CSV contents are not committed to the public repository.
 
 ### Floor-plan rules
 
@@ -25,6 +29,10 @@ FPmatic ships a **format-preserved copy of the exact original blank floor-plan w
 The exporter uses local JSZip and surgically updates **only occupied event cells, their new merge ranges, and newly appended event styles** in the original XLSX ZIP. It never rebuilds the original worksheets using the spreadsheet conversion library.
 
 To retain the private employee reference names in the export, choose **Excel master** and select your complete original `.xlsx` file. Everything stays in your browser and the original is never overwritten.
+
+## Regression checks
+
+The GitHub Pages workflow runs the original-master Excel preservation tests, floor stacking/border checks, and the CSV report join tests before deploying.
 
 ## Development / hosting
 
