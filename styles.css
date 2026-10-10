@@ -47,3 +47,30 @@ main{width:min(96vw,1680px);margin:0 auto;padding:34px 0 70px}.panel{background:
 .event-plot.tentative{border:0}
 .event-plot.plot-compact,.event-plot.plot-compact .plot-name{font-size:11px;line-height:1.1}
 .event-plot>span{max-width:100%;overflow:hidden;text-overflow:clip;overflow-wrap:break-word}
+
+
+/* ARMatic-style compact report upload. Floor plan grid stays spreadsheet-accurate. */
+.site-header{min-height:77px}
+.brand-caption{display:none}
+.intro{width:min(92vw,510px);max-width:510px;margin:clamp(28px,8vh,110px) auto 0;padding:42px 38px 30px;text-align:center}
+.intro .landing-mark{margin:0 auto 17px;width:58px;height:58px;font-size:1.4rem}
+.intro .brand-title{font:700 clamp(2.7rem,8vw,4rem)/1 Georgia,"Times New Roman",serif;letter-spacing:-.055em;color:#fff;margin:0}
+.intro .brand-title span{color:#78a8d8}
+.intro .landing-subtitle{font-size:.88rem;color:#a7a7b2;line-height:1.5;margin:10px auto 26px}
+.reports-grid{display:grid;gap:10px}
+.report-file{display:flex;align-items:center;justify-content:space-between;gap:13px;min-height:61px;text-align:left;background:#13161a;border:1px dashed #46576b;border-radius:10px;padding:14px 15px;cursor:pointer;transition:.15s ease}
+.report-file:hover,.report-file.dragging{background:#1a222c;border-color:#77a4d3}
+.report-file.ready{border-style:solid;border-color:#4d8969;background:#14221b}
+.report-file-name{font-size:.86rem;font-weight:850;color:#e5e5ea;white-space:nowrap}
+.report-file-status{color:#82add9;font-size:.73rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px;text-align:right}
+.report-file.ready .report-file-status{color:#83c79b}
+.intro .upload-button{margin-top:17px;width:100%;padding:15px;font-size:.94rem;font-weight:850;border-radius:10px}
+.intro .report-feedback{margin:10px 0 0;font-size:.72rem;min-height:15px;line-height:1.4;color:#c09b7f}
+.intro .report-feedback:empty{min-height:4px;margin:2px 0 0}
+.link-button{display:block;border:0;background:none;color:#8c94a0;font-size:.73rem;margin:16px auto 0;padding:4px 8px;text-decoration:underline;text-underline-offset:3px}
+.link-button:hover{color:#c4d9ee}
+.stat{padding:13px 16px}.stat strong{font-size:1.4rem}.stat span{font-size:.57rem}
+.week-subtitle{font-size:.72rem}
+.top-row h2{font-size:1.85rem;margin:2px 0 5px}
+.board-foot{font-size:.68rem}
+@media(max-width:650px){.intro{padding:32px 20px}.report-file{padding:12px;min-height:58px}.report-file-status{max-width:130px}.site-header{flex-wrap:wrap}.header-actions{flex-wrap:wrap}}
