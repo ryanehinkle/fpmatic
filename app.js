@@ -231,7 +231,7 @@ function renderPeriod(floor,part,recordList){
     const hasConflict=allIssues().some(i=>i.event.id===e.id&&i.msg.startsWith("Bay/time conflict"));
     return '<button type="button" class="event-plot'+(tiny?" plot-compact":"")+(e.status==="Tentative"?" tentative":"")+(state.selection===e.id?" selected":"")+(hasConflict?" conflict":"")+'" data-event="'+escapeHtml(e.id)+'" title="'+escapeHtml(e.name+" | "+r.range.start+"-"+r.range.end+" | "+fmtRange(e.start,e.end))+'" style="grid-column:'+(r.range.start%100)+' / '+(r.range.end%100+1)+';grid-row:'+(r.row+1)+' / span '+r.height+';background:'+color(e)+';color:'+(e.status==="Tentative"&&e.category!=="Pleaser"?"#fff":"#151515")+'">'+lines.map((t,i)=>'<span'+(i===0?' class="plot-name"':'')+'>'+escapeHtml(t)+'</span>').join("")+'</button>';
   }).join("");
-  return '<div class="period-wrap"><div class="period-label">'+part+'</div><div class="event-grid">'+plots+'</div></div>';
+  return '<div class="period-wrap"><div class="period-label '+part.toLowerCase()+'">'+part+'</div><div class="event-grid">'+plots+'</div></div>';
 }
 function floorBoard(floor,layout){
   const ids=Array.from({length:34},(_,i)=>floor*100+i+1);
