@@ -15,6 +15,7 @@
   </div>
   <div class="header-actions">
     <button id="newUpload" class="button subtle" type="button">＋ Upload BEOs</button>
+    <label class="button subtle" for="templateInput" title="Use your exact Excel master workbook for export">Excel master</label>
     <button id="export" class="button primary" type="button" disabled>↓ Export Floor Plan</button>
   </div>
 </header>
@@ -65,7 +66,7 @@
   <label>Golf start (optional)<input id="editGolfStart" type="time"></label>
   <label>Golf end (optional)<input id="editGolfEnd" type="time"></label>
   <label>Assigned bays (e.g. 205-214)<input id="editBays" placeholder="205-214"></label>
-  <label>Event space<select id="editSpace"><option value="">No room/space</option><option value="Sig N">Signature North</option><option value="Sig S">Signature South</option><option value="Sig N+S">Both Signature Rooms</option><option value="LL">Lower Lounge</option><option value="UL">Upper Lounge</option><option value="Terrace">Terrace</option><option value="Other">Other space</option></select></label>
+  <label>Event space<input id="editSpace" placeholder="Sig S, Sig N+S, LL…"></label>
   <label>Floor-plan label<input id="editPackage" placeholder="Flex, Fajita, Ultimate..."></label>
   <label>Color category<select id="editCategory"><option>Flex</option><option>Pleaser</option><option>Buffet</option><option>Field Trip</option><option>Youth</option></select></label>
   <label>Booking status<select id="editStatus"><option>Definite</option><option>Tentative</option></select></label>
