@@ -198,7 +198,8 @@ function layoutDay(events){
     for(const a of records)if(records.some(b=>a!==b&&overlaps(a.range,b.range)))a.height=2;
     const occupancy=Array.from({length:5},()=>Array(34).fill(null));
     for(const r of records){
-      const starts=r.height===2?[0,3,2,1]:[0,2,1];
+      // Stack back-to-back 2-row events at rows 1–2 and 3–4, leaving row 5 blank.
+      const starts=r.height===2?[0,2,3,1]:[0,2,1];
       for(const start of starts){
         let free=true;
         for(let y=start;y<start+r.height&&free;y++)for(let x=r.range.start%100-1;x<r.range.end%100;x++)if(occupancy[y][x]){free=false;break}
