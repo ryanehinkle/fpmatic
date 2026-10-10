@@ -115,7 +115,8 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
   // Every grid coordinate in the original master is already a <c> element.
   // Rewrite these elements only. Leave every non-event cell and sheet XML
   // attribute untouched, including row heights and existing merge definitions.
-  xml=xml.replace(/<c\b[^>]*\br="([A-Z]{1,3}\d+)"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,(original,ref)=>{
+  xml=xml.replace(/<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*?\/>|<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*>[\s\S]*?<\/c>/g,(original,selfClosingRef,normalRef)=>{
+    const ref=selfClosingRef||normalRef;
     const change=assignments.get(ref);
     if(!change)return original;
     replacements++;
