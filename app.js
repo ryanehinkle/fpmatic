@@ -127,7 +127,8 @@ function eventFromPages(pages,beo,file){
   if(!name)name="Event "+beo;
   const golfField=findField(first,"GOLF BAYS");
   const noteLine=pages.map(p=>findField(p.lines,"BAY LEVEL ASSIGNMENT\\(S\\)")).find(v=>baySegments(v).length)||"";
-  const bays=baySegments(golfField).length?golfField:noteLine;
+  const bayRanges=baySegments(golfField).length?baySegments(golfField):baySegments(noteLine);
+  const bays=bayRanges.map(r=>r.start===r.end?String(r.start):r.start+"-"+r.end).join(", ");
   const booking=findField(first,"BOOKING TYPE");
   const catering=findField(first,"CATERING LOCATION");
   const x=categoryAndPackage(pre,booking,catering,name);
