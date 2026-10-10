@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FPmatic • Topgolf Floor Plans</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="brand" id="brand" title="FPmatic">
+    <div class="brand-mark">FP</div>
+    <div><h1><span>FP</span>matic</h1><div class="brand-caption">EVENT FLOOR PLAN BUILDER</div></div>
+  </div>
+  <div class="header-actions">
+    <button id="newUpload" class="button subtle" type="button">＋ Upload BEOs</button>
+    <button id="export" class="button primary" type="button" disabled>↓ Export Floor Plan</button>
+  </div>
+</header>
+<main>
+  <section class="intro panel" id="intro">
+    <div class="eyebrow">AUTOMATIC EVENT PLOTTING</div>
+    <h2>Floor plans, <em>without the busywork.</em></h2>
+    <p>Drop your combined weekly Manager BEO PDF. FPmatic reads the bays, event times, rooms, packages, and booking status, then plots each event onto your Monday–Sunday floor plan.</p>
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload BEO PDF">
+      <div class="upload-icon">↑</div>
+      <strong>Drop your BEO PDFs here</strong>
+      <span>or click to browse · multiple PDFs supported</span>
+      <div class="small-muted">PDFs are processed in your browser. Nothing is uploaded to a server.</div>
+    </div>
+    <div class="template-choice"><label class="template-trigger" for="templateInput">Optional: load the original Excel master for exact-template export</label><span id="templateFileName">Built-in template layout ready</span></div>
+    <div class="intro-bottom"><span class="legend-dot" style="background:#d9ead3"></span> Flex <span class="legend-dot" style="background:#c9daf8"></span> Buffet <span class="legend-dot" style="background:#fff2cc"></span> Pleaser <span class="legend-dot" style="background:#d9d2e9"></span> Field Trip <span class="legend-dot" style="background:#f4cccc"></span> Youth</div>
+  </section>
+  <section class="workspace" id="workspace" hidden>
+    <div class="top-row">
+      <div><div class="eyebrow">WEEKLY EVENT OPERATIONS</div><h2 id="weekTitle">Floor Plan</h2><div class="week-subtitle" id="fileSummary"></div></div>
+      <div class="week-control"><button id="prevWeek" title="Previous week">‹</button><span id="weekPickerLabel"></span><button id="nextWeek" title="Next week">›</button></div>
+    </div>
+    <div class="stats"><div class="stat"><strong id="statEvents">0</strong><span>EVENTS THIS WEEK</span></div><div class="stat"><strong id="statPlotted">0</strong><span>EVENTS PLOTTED</span></div><div class="stat"><strong id="statNeeds">0</strong><span>NEEDS REVIEW</span></div><div class="stat"><strong id="statStatus">—</strong><span>BOOKING STATUS</span></div></div>
+    <nav class="day-tabs" id="dayTabs" aria-label="Day of week"></nav>
+    <div class="work-grid">
+      <section class="board-panel panel">
+        <div class="panel-heading"><div><h3 id="dayHeading">Monday</h3><div class="mini" id="daySubheading"></div></div><div class="board-tools"><button class="button subtle small" id="toggleNames">Show bays</button><span id="dayTotal" class="count-pill"></span></div></div>
+        <div class="board-scroll"><div id="floorBoards" class="floor-boards"></div></div>
+        <div class="board-foot">Yellow headers = couch bays · White headers = high-tops · Select an event to edit · The BEO controls bay assignments</div>
+      </section>
+      <aside class="right-col">
+        <section class="panel"><div class="panel-heading"><h3>Events</h3><span id="eventListCount" class="count-pill">0</span></div><div class="list-filters"><input type="search" id="eventSearch" placeholder="Search events or bays" aria-label="Search events"><select id="eventFilter" aria-label="Filter events"><option value="all">All events</option><option value="issues">Needs review</option><option value="AM">AM only</option><option value="PM">PM only</option></select></div><div id="eventList" class="event-list"></div><button id="addEvent" class="button subtle add-event" type="button">＋ Add event manually</button></section>
+        <section class="panel issues-panel"><div class="panel-heading"><h3>Review</h3><span id="issueCount" class="count-pill">0</span></div><div id="issues" class="issue-list"></div></section>
+      </aside>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<dialog id="editorDialog" class="editor-dialog">
+<form id="editorForm" method="dialog">
+  <div class="modal-heading"><div><div class="eyebrow">EVENT DETAILS</div><h2 id="editorTitle">Edit event</h2></div><button class="icon-button" type="button" id="closeEditor" aria-label="Close">×</button></div>
+  <div class="form-grid">
+  <label class="wide">Event name<input id="editName" required></label>
+  <label>Event date<input id="editDate" type="date" required></label>
+  <label>Guest count<input id="editGuests" type="number" min="0"></label>
+  <label>Start time<input id="editStart" type="time" required></label>
+  <label>End time<input id="editEnd" type="time" required></label>
+  <label>Golf start (optional)<input id="editGolfStart" type="time"></label>
+  <label>Golf end (optional)<input id="editGolfEnd" type="time"></label>
+  <label>Assigned bays (e.g. 205-214)<input id="editBays" placeholder="205-214"></label>
+  <label>Event space<select id="editSpace"><option value="">No room/space</option><option value="Sig N">Signature North</option><option value="Sig S">Signature South</option><option value="Sig N+S">Both Signature Rooms</option><option value="LL">Lower Lounge</option><option value="UL">Upper Lounge</option><option value="Terrace">Terrace</option><option value="Other">Other space</option></select></label>
+  <label>Floor-plan label<input id="editPackage" placeholder="Flex, Fajita, Ultimate..."></label>
+  <label>Color category<select id="editCategory"><option>Flex</option><option>Pleaser</option><option>Buffet</option><option>Field Trip</option><option>Youth</option></select></label>
+  <label>Booking status<select id="editStatus"><option>Definite</option><option>Tentative</option></select></label>
+  </div>
+  <div class="editor-note" id="editorNote"></div>
+  <div class="modal-footer"><button id="deleteEvent" type="button" class="button dangerous">Delete</button><div class="footer-right"><button id="cancelEditor" type="button" class="button subtle">Cancel</button><button type="submit" class="button primary">Save event</button></div></div>
+</form>
+</dialog>
+<input id="pdfInput" type="file" accept=".pdf,application/pdf" multiple hidden>
+<input id="templateInput" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
