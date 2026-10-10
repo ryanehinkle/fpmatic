@@ -26,7 +26,7 @@ Browser session event edits are saved in local storage; imported PDFs and origin
 
 ## Development / hosting
 
-No build step. GitHub Pages from the repository's **main** branch, root folder. Dependencies served by CDNs:
+No build step. GitHub Pages deployment runs automatically via `.github/workflows/pages.yml` after Pages is enabled. The repository owner must first open **Settings → Pages → Build and deployment → Source → GitHub Actions**, save, then rerun the deployment workflow in **Actions**. The workflow cannot create a Pages site if the repository's token lacks Pages administration permission. Dependencies served by CDNs:
 - pdf.js 4.10.38
 - xlsx-js-style 1.2.0
 
