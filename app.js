@@ -1,3 +1,4 @@
+import {exportExactFloorPlan} from "./excel-export.js?v=20261010c";
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
 
@@ -368,65 +369,21 @@ function removeMasterPlots(ws){
 }
 async function exportWorkbook(){
   if(!state.events.length)return;
-  if(typeof XLSX==="undefined")return notify("Excel library could not load. Check your connection.");
-  let wb;
-  try {
-    if(state.master){
-      wb=XLSX.read(state.master,{type:"array",cellStyles:true,cellDates:true});
-    } else {
-      const response=await fetch("./master.xlsx",{cache:"force-cache"});
-      if(!response.ok)throw new Error("Built-in Excel template missing");
-      const buffer=await response.arrayBuffer();
-      wb=XLSX.read(buffer,{type:"array",cellStyles:true,cellDates:true});
-      const first=wb.Sheets.Monday;
-      if(!first)throw new Error("Built-in template is invalid");
-      for(const day of DAYS.slice(1)){
-        if(!wb.Sheets[day]){
-          const copy=JSON.parse(JSON.stringify(first));
-          wb.Sheets[day]=copy;
-          wb.SheetNames.push(day);
-        }
-      }
-    }
-  }catch(error){
-    console.warn("Falling back to template-derived workbook layout:",error);
-    wb=buildTemplate();
-    notify("Built-in master unavailable. Using the fallback floorplan layout.");
-  }
-  const issues=[];
-  for(let day=0;day<7;day++){
-    const iso=addDays(state.week,day),events=weeksEvents().filter(e=>e.date===iso),lay=layoutDay(events);
-    const ws=wb.Sheets[DAYS[day]];
-    if(!ws){issues.push("Missing worksheet: "+DAYS[day]);continue}
-    removeMasterPlots(ws);
-    for(const rec of Object.values(lay.records).flat()){
-      if(rec.row<0){issues.push(rec.event.name+" could not fit on "+DAYS[day]);continue}
-      const e=rec.event;
-      const startRow=({3:4,2:20,1:36}[rec.range.floor])+(period(e)==="PM"?5:0)+rec.row;
-      const endRow=startRow+rec.height-1;
-      const c1=4+rec.range.start%100,c2=4+rec.range.end%100;
-      const style=baseStyle(color(e),{sz:rec.height===2?18:20,fontColor:e.status==="Tentative"&&e.category!=="Pleaser"?"#FFFFFF":"#000000"});
-      style.font.name="Calibri";
-      delete style.border;
-      for(let y=startRow;y<=endRow;y++)for(let x=c1;x<=c2;x++)setCell(ws,cellName(x,y),"",style);
-      const address=cellName(c1,startRow);
-      setCell(ws,address,displayLines(e).join("\n"),style);
-      if(!ws["!merges"])ws["!merges"]=[];
-      // Remove any exact-range duplicate before adding the event.
-      ws["!merges"]=ws["!merges"].filter(m=>!(m.s.c===c1-1&&m.s.r===startRow-1&&m.e.c===c2-1&&m.e.r===endRow-1));
-      if(c2>c1||endRow>startRow)merge(ws,[c1,startRow],[c2,endRow]);
-    }
-    issues.push(...lay.overflow.map(e=>e.event.name+" could not fit"));
-  }
-  const fileStart=localDate(state.week),fileEnd=localDate(addDays(state.week,6));
-  const formatFile=d=>pad(d.getMonth()+1)+"."+pad(d.getDate())+"."+String(d.getFullYear()).slice(2);
-  const filename=formatFile(fileStart)+" - "+formatFile(fileEnd)+" Floorplan.xlsx";
-  try {
-    XLSX.writeFile(wb,filename,{bookType:"xlsx",compression:true,cellStyles:true});
-    notify("Downloading "+filename+(issues.length?" · "+issues.length+" layout warning(s)":""));
-  } catch(error) {
-    console.error("FPmatic Excel export failed:",error);
-    notify("Excel export failed: "+(error?.message||"unknown error"));
+  const button=$("export");
+  button.disabled=true;
+  const originalText=button.textContent;
+  button.textContent="Preparing Excel…";
+  try{
+    const exported=await exportExactFloorPlan({
+      state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays
+    });
+    notify("Downloaded "+exported.filename+" — original master formatting preserved.");
+  }catch(err){
+    console.error("FPmatic exact-template export failed:",err);
+    notify("Export failed: "+(err.message||String(err)));
+  }finally{
+    button.disabled=false;
+    button.textContent=originalText;
   }
 }
 $("dropzone").addEventListener("click",()=>$("pdfInput").click());
