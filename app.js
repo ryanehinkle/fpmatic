@@ -220,7 +220,7 @@ function renderLandmarks(floor){
   const entries=floor===3?[[9,16,"Terrace"],[17,18,"DOORS","doors"],[21,21,"DOOR","doors"],[25,31,"Upper Lounge"]]:
     floor===2?[[7,10,"Sig North"],[11,14,"Sig South"],[15,20,"3 Heater Bays"],[21,22,"DOORS","doors"]]:
     [[9,14,"3 Heater Bays"],[24,26,"Lower Lounge"],[29,30,"DOORS","doors"]];
-  return entries.map(a=>'<div class="landmark '+(a[3]||"")+'" style="grid-column:'+(a[0]+1)+' / '+(a[1]+2)+'">'+escapeHtml(a[2])+'</div>').join("");
+  return entries.map(a=>'<div class="landmark '+(a[3]||"")+'" style="grid-column:'+a[0]+' / '+(a[1]+1)+'">'+escapeHtml(a[2])+'</div>').join("");
 }
 function renderPeriod(floor,part,recordList){
   const plots=recordList.filter(r=>r.row>=0).map(r=>{
