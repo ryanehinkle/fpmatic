@@ -74,3 +74,9 @@ main{width:min(96vw,1680px);margin:0 auto;padding:34px 0 70px}.panel{background:
 .top-row h2{font-size:1.85rem;margin:2px 0 5px}
 .board-foot{font-size:.68rem}
 @media(max-width:650px){.intro{padding:32px 20px}.report-file{padding:12px;min-height:58px}.report-file-status{max-width:130px}.site-header{flex-wrap:wrap}.header-actions{flex-wrap:wrap}}
+
+/* The landing page is a single focused ARMatic-style upload card. */
+body.is-landing .site-header{display:none}
+body.is-landing main{padding-top:0}
+body.is-landing .intro{margin:clamp(40px,12vh,130px) auto 0}
+@media(max-width:650px){body.is-landing .intro{margin:clamp(20px,7vh,60px) auto 0}}
