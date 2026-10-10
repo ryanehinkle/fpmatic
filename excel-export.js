@@ -28,53 +28,101 @@ function replaceSection(xml,sectionName,transform){
   return xml.replace(match[0],replacement);
 }
 function recolorStyles(xml){
+  // Append only the colors/fonts we need; keep every original master style intact.
   const colorToFill=new Map();
-  let fillCount=0;
   xml=replaceSection(xml,"fills",section=>{
-    const tags=[...section.matchAll(/<fill(?:\s[^>]*)?>[\s\S]*?<\/fill>/g)];
-    fillCount=tags.length;
-    tags.forEach((hit,index)=>{
+    const fills=[...section.matchAll(/<fill(?:\s[^>]*)?>[\s\S]*?<\/fill>/g)];
+    let count=fills.length;
+    fills.forEach((hit,index)=>{
       const rgb=(hit[0].match(/<fgColor\b[^>]*rgb="(?:FF)?([0-9A-Fa-f]{6})"/)||[])[1];
       if(rgb)colorToFill.set(rgb.toUpperCase(),index);
     });
-    let toAdd="";
-    Object.values(COLORS).flat().forEach(color=>{
-      if(colorToFill.has(color))return;
-      colorToFill.set(color,fillCount++);
-      toAdd+='<fill><patternFill patternType="solid"><fgColor rgb="FF'+color+'"/><bgColor indexed="64"/></patternFill></fill>';
-    });
-    return section.replace(/<fills\b([^>]*)>/,(_,attrs)=>'<fills'+attrs.replace(/\bcount="\d+"/,'count="'+fillCount+'"')+'>').replace("</fills>",toAdd+"</fills>");
+    let appended="";
+    for(const color of Object.values(COLORS).flat()){
+      if(colorToFill.has(color))continue;
+      colorToFill.set(color,count++);
+      appended+='<fill><patternFill patternType="solid"><fgColor rgb="FF'+color+'"/><bgColor indexed="64"/></patternFill></fill>';
+    }
+    return section.replace(/<fills\b([^>]*)>/,(_,attrs)=>
+      '<fills'+attrs.replace(/\bcount="\d+"/,'count="'+count+'"')+'>'
+    ).replace("</fills>",appended+"</fills>");
   });
-  let whiteFontId=-1;
+
+  const fontIds={};
   xml=replaceSection(xml,"fonts",section=>{
     const count=Number((section.match(/<fonts\b[^>]*count="(\d+)"/)||[])[1]);
-    if(!Number.isFinite(count))throw new Error("Excel template font table is invalid");
-    whiteFontId=count;
-    const extra='<font><b/><sz val="20"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>';
-    return section.replace(/<fonts\b([^>]*)>/,(_,attrs)=>'<fonts'+attrs.replace(/\bcount="\d+"/,'count="'+(count+1)+'"')+'>').replace("</fonts>",extra+"</fonts>");
-  });
-  const styleIds={};
-  xml=replaceSection(xml,"cellXfs",section=>{
-    const start=Number((section.match(/<cellXfs\b[^>]*count="(\d+)"/)||[])[1]);
-    if(!Number.isInteger(start)||start<1)throw new Error("Excel template style table is invalid");
-    let additions="";
-    let n=0;
-    for(const [category,colors] of Object.entries(COLORS)){
-      styleIds[category]={};
-      for(let tentative=0;tentative<2;tentative++){
-        const status=tentative?"Tentative":"Definite",fill=colorToFill.get(colors[tentative]);
-        styleIds[category][status]={};
-        for(const compact of [false,true]){
-          const fontId=tentative && ["Buffet","Flex","Field Trip","Youth"].includes(category)?whiteFontId:(compact?9:18);
-          const name=compact?"compact":"normal";
-          styleIds[category][status][name]=start+n++;
-          additions+='<xf numFmtId="0" fontId="'+fontId+'" fillId="'+fill+'" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>';
-        }
-      }
+    if(!Number.isInteger(count))throw new Error("Invalid Excel master font table");
+    let appended="",next=count;
+    for(const compact of [false,true])for(const white of [false,true]){
+      const key=(compact?"compact":"normal")+(white?"White":"Black");
+      fontIds[key]=next++;
+      appended+='<font><b/><sz val="'+(compact?18:20)+'"/><color rgb="'+(white?"FFFFFFFF":"FF000000")+'"/><name val="Calibri"/><family val="2"/></font>';
     }
-    return section.replace(/<cellXfs\b([^>]*)>/,(_,attrs)=>'<cellXfs'+attrs.replace(/\bcount="\d+"/,'count="'+(start+n)+'"')+'>').replace("</cellXfs>",additions+"</cellXfs>");
+    return section.replace(/<fonts\b([^>]*)>/,(_,attrs)=>
+      '<fonts'+attrs.replace(/\bcount="\d+"/,'count="'+next+'"')+'>'
+    ).replace("</fonts>",appended+"</fonts>");
   });
-  return {xml,styleIds};
+
+  const xfsMatch=xml.match(/<cellXfs\b[^>]*>[\s\S]*?<\/cellXfs>/);
+  if(!xfsMatch)throw new Error("Invalid Excel master cell style table");
+  const originals=[...xfsMatch[0].matchAll(/<xf(?:\s[^>]*)?(?:\/>|>[\s\S]*?<\/xf>)/g)].map(x=>x[0]);
+  const created=[],cached=new Map();
+
+  function setAttribute(tag,key,value){
+    const attr=new RegExp("\\b"+key+'="[^"]*"');
+    return attr.test(tag)?tag.replace(attr,key+'="'+value+'"'):tag.replace(/\/?>$/,match=>' '+key+'="'+value+'"'+match);
+  }
+  function cloneBaseXf(baseIndex,fillId,fontId){
+    // Start with the EXACT source cell's XF, so its borderId (including thick
+    // left/right outlines and AM/PM top/bottom rules) is never discarded.
+    let original=originals[baseIndex];
+    if(!original)throw new Error("Unknown style "+baseIndex+" in master");
+    const tag=original.match(/^<xf\b[^>]*\/?>/);
+    if(!tag)throw new Error("Invalid master style "+baseIndex);
+    let next=tag[0];
+    next=setAttribute(next,"fillId",fillId);
+    next=setAttribute(next,"fontId",fontId);
+    next=setAttribute(next,"applyFill",1);
+    next=setAttribute(next,"applyFont",1);
+    next=setAttribute(next,"applyAlignment",1);
+    original=original.replace(tag[0],next);
+    const alignment='<alignment horizontal="center" vertical="center" wrapText="1"/>';
+    if(next.endsWith("/>")){
+      return original.replace(/\/>$/,'>'+alignment+'</xf>');
+    }
+    if(/<alignment\b[^>]*\/>/.test(original)){
+      return original.replace(/<alignment\b[^>]*\/>/,alignment);
+    }
+    return original.replace("</xf>",alignment+"</xf>");
+  }
+
+  const styleIds={
+    resolve(baseIndex,event,compact){
+      const category=COLORS[event.category]?event.category:"Flex";
+      const tentative=event.status==="Tentative";
+      const color=COLORS[category][tentative?1:0];
+      const white=tentative&&category!=="Pleaser";
+      const fontId=fontIds[(compact?"compact":"normal")+(white?"White":"Black")];
+      const fillId=colorToFill.get(color);
+      const key=[baseIndex,fillId,fontId].join(":");
+      if(!cached.has(key)){
+        cached.set(key,originals.length+created.length);
+        created.push(cloneBaseXf(baseIndex,fillId,fontId));
+      }
+      return cached.get(key);
+    }
+  };
+
+  function finalize(stylesXml){
+    if(!created.length)return stylesXml;
+    return replaceSection(stylesXml,"cellXfs",section=>{
+      const count=originals.length+created.length;
+      return section.replace(/<cellXfs\b([^>]*)>/,(_,attrs)=>
+        '<cellXfs'+attrs.replace(/\bcount="\d+"/,'count="'+count+'"')+'>'
+      ).replace("</cellXfs>",created.join("")+"</cellXfs>");
+    });
+  }
+  return {xml,styleIds,finalize};
 }
 function colName(n){
   let s="";
@@ -97,13 +145,13 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
     if(!base)continue;
     const r1=base+(p==="PM"?5:0)+rec.row,r2=r1+rec.height-1;
     const c1=4+rec.range.start%100,c2=4+rec.range.end%100;
-    const fillStyle=(styleIds[event.category]||styleIds.Flex)[event.status==="Tentative"?"Tentative":"Definite"][rec.height===2?"compact":"normal"];
+    const compact=rec.height===2;
     const first=colName(c1)+r1,last=colName(c2)+r2;
     for(let row=r1;row<=r2;row++)for(let col=c1;col<=c2;col++){
       const address=colName(col)+row;
       if(assignments.has(address))throw new Error("Events overlap in the export at "+address);
       assignments.set(address,{
-        style:fillStyle,
+        event,compact,
         text:(row===r1&&col===c1)?displayLines(event).join("\n"):null
       });
     }
@@ -120,7 +168,8 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
     const change=assignments.get(ref);
     if(!change)return original;
     replacements++;
-    const s=String(change.style);
+    const originalStyle=Number((original.match(/\bs="(\d+)"/)||[])[1]||0);
+    const s=String(styleIds.resolve(originalStyle,change.event,change.compact));
     if(change.text===null)return '<c r="'+ref+'" s="'+s+'"/>';
     return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEscape(change.text)+'</t></is></c>';
   });
@@ -156,7 +205,7 @@ export async function exportExactFloorPlan({state,weekEvents,layoutDay,period,di
   const zip=await JSZip.loadAsync(masterBytes,{checkCRC32:true});
   const styleFile=zip.file("xl/styles.xml");
   if(!styleFile)throw new Error("Original master has no Excel formatting table");
-  const {xml:updatedStyles,styleIds}=recolorStyles(await styleFile.async("string"));
+  const {xml:updatedStyles,styleIds,finalize}=recolorStyles(await styleFile.async("string"));
   // Do not touch any other workbook part besides styles.xml and event bay cells.
   const modified=new Map();
   let count=0;
@@ -169,7 +218,7 @@ export async function exportExactFloorPlan({state,weekEvents,layoutDay,period,di
     modified.set(path,xml);
     count+=dayCount;
   }
-  zip.file("xl/styles.xml",updatedStyles);
+  zip.file("xl/styles.xml",finalize(updatedStyles));
   for(const [path,xml] of modified)zip.file(path,xml);
   const result=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
   const filename=formatDownloadDate(state.week)+" - "+formatDownloadDate(addDays(state.week,6))+" Floorplan.xlsx";
