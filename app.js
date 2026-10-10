@@ -428,6 +428,7 @@ for(const ev of ["dragleave","drop"]){$("dropzone").addEventListener(ev,e=>{e.pr
 $("dropzone").addEventListener("drop",e=>importFiles(e.dataTransfer.files));
 $("pdfInput").addEventListener("change",e=>importFiles(e.target.files));
 $("newUpload").addEventListener("click",()=>$("pdfInput").click());
+$("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.master=null;try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
 $("templateInput").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;state.master=await file.arrayBuffer();$("templateFileName").textContent=file.name+" ready";notify("Original Excel master loaded for export");});
 $("export").addEventListener("click",exportWorkbook);
 $("prevWeek").addEventListener("click",()=>{state.week=addDays(state.week,-7);state.day=0;render()});
