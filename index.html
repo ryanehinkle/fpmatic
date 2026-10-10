@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FPmatic • Topgolf Floor Plans</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261010d">
+<link rel="stylesheet" href="styles.css?v=20261010e">
 </head>
 <body>
 <header class="site-header">
@@ -14,7 +14,8 @@
     <div><h1><span>FP</span>matic</h1><div class="brand-caption">EVENT FLOOR PLAN BUILDER</div></div>
   </div>
   <div class="header-actions">
-    <button id="newUpload" class="button subtle" type="button">＋ Upload BEOs</button>
+    <button id="newUpload" class="button subtle" type="button">＋ Upload reports</button>
+    <button id="beoUpload" class="button subtle" type="button" title="Optional BEO PDF import">BEO PDF</button>
     <button id="resetAll" class="button subtle" type="button" title="Start over with a new weekly BEO packet">Reset</button>
     <label class="button subtle" for="templateInput" title="Use your exact Excel master workbook for export">Excel master</label>
     <button id="export" class="button primary" type="button" disabled>↓ Export Floor Plan</button>
@@ -22,21 +23,26 @@
 </header>
 <main>
   <section class="intro panel" id="intro">
-    <div class="eyebrow">AUTOMATIC EVENT PLOTTING</div>
-    <h2>Floor plans, <em>without the busywork.</em></h2>
-    <p>Drop your combined weekly Manager BEO PDF. FPmatic reads the bays, event times, rooms, packages, and booking status, then plots each event onto your Monday–Sunday floor plan.</p>
-    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload BEO PDF">
-      <div class="upload-icon">↑</div>
-      <strong>Drop your BEO PDFs here</strong>
-      <span>or click to browse · multiple PDFs supported</span>
-      <div class="small-muted">PDFs are processed in your browser. Nothing is uploaded to a server.</div>
+    <div class="brand-mark landing-mark">FP</div>
+    <h2 class="brand-title"><span>FP</span>matic</h2>
+    <p class="landing-subtitle">Upload reports</p>
+    <div class="reports-grid" id="reportsDropzone">
+      <label class="report-file" for="staffInput" id="staffBox">
+        <span class="report-file-name">Event Staffing</span>
+        <span class="report-file-status" id="staffFileName">Choose CSV</span>
+      </label>
+      <label class="report-file" for="menuInput" id="menuBox">
+        <span class="report-file-name">Catering Menus</span>
+        <span class="report-file-status" id="menuFileName">Choose CSV</span>
+      </label>
     </div>
-    <div class="template-choice"><label class="template-trigger" for="templateInput">Optional: use the full original Excel master (including reference tabs)</label><span id="templateFileName">Built-in floor-plan master loaded automatically</span></div>
-    <div class="intro-bottom"><span class="legend-dot" style="background:#d9ead3"></span> Flex <span class="legend-dot" style="background:#c9daf8"></span> Buffet <span class="legend-dot" style="background:#fff2cc"></span> Pleaser <span class="legend-dot" style="background:#d9d2e9"></span> Field Trip <span class="legend-dot" style="background:#f4cccc"></span> Youth</div>
+    <button id="buildFromReports" type="button" class="button primary upload-button" disabled>Build floor plan</button>
+    <p class="report-feedback" id="reportFeedback" role="status" aria-live="polite"></p>
+    <button id="beoLanding" type="button" class="link-button">Use BEO PDF instead</button>
   </section>
   <section class="workspace" id="workspace" hidden>
     <div class="top-row">
-      <div><div class="eyebrow">WEEKLY EVENT OPERATIONS</div><h2 id="weekTitle">Floor Plan</h2><div class="week-subtitle" id="fileSummary"></div></div>
+      <div><h2 id="weekTitle">Floor Plan</h2><div class="week-subtitle" id="fileSummary"></div></div>
       <div class="week-control"><button id="prevWeek" title="Previous week">‹</button><span id="weekPickerLabel"></span><button id="nextWeek" title="Next week">›</button></div>
     </div>
     <div class="stats"><div class="stat"><strong id="statEvents">0</strong><span>EVENTS THIS WEEK</span></div><div class="stat"><strong id="statPlotted">0</strong><span>EVENTS PLOTTED</span></div><div class="stat"><strong id="statNeeds">0</strong><span>NEEDS REVIEW</span></div><div class="stat"><strong id="statStatus">—</strong><span>BOOKING STATUS</span></div></div>
@@ -45,7 +51,7 @@
       <section class="board-panel panel">
         <div class="panel-heading"><div><h3 id="dayHeading">Monday</h3><div class="mini" id="daySubheading"></div></div><div class="board-tools"><button class="button subtle small" id="toggleNames">Hide bays</button><span id="dayTotal" class="count-pill"></span></div></div>
         <div class="board-scroll"><div id="floorBoards" class="floor-boards"></div></div>
-        <div class="board-foot">Yellow headers = couch bays · White headers = high-tops · Select an event to edit · The BEO controls bay assignments</div>
+        <div class="board-foot">Yellow: couch bays · White: high-tops · Click event to edit</div>
       </section>
       <aside class="right-col">
         <section class="panel"><div class="panel-heading"><h3>Events</h3><span id="eventListCount" class="count-pill">0</span></div><div class="list-filters"><input type="search" id="eventSearch" placeholder="Search events or bays" aria-label="Search events"><select id="eventFilter" aria-label="Filter events"><option value="all">All events</option><option value="issues">Needs review</option><option value="AM">AM only</option><option value="PM">PM only</option></select></div><div id="eventList" class="event-list"></div><button id="addEvent" class="button subtle add-event" type="button">＋ Add event manually</button></section>
@@ -77,8 +83,11 @@
 </form>
 </dialog>
 <input id="pdfInput" type="file" accept=".pdf,application/pdf" multiple hidden>
+<input id="staffInput" type="file" accept=".csv,text/csv" hidden>
+<input id="menuInput" type="file" accept=".csv,text/csv" hidden>
+<input id="csvInput" type="file" accept=".csv,text/csv" multiple hidden>
 <input id="templateInput" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
 <script src="./jszip.min.js?v=20261010d"></script>
-<script type="module" src="app.js?v=20261010d"></script>
+<script type="module" src="app.js?v=20261010e"></script>
 </body>
 </html>
