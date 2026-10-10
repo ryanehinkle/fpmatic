@@ -20,7 +20,7 @@ FPmatic extracts events, dates, times, guest counts, booking status, bay assignm
 
 ### Excel export and master
 
-The app includes a built-in event-focused workbook layout based on the uploaded blank floor-plan template's grid coordinates, floor numbering, and venue landmarks. For a **full-fidelity export using the complete original master**, select **Excel master** and choose the blank .xlsx file before exporting. That file is read only in your browser; the original is never overwritten. The precise master is not stored in this public repository.
+The app includes **master.xlsx**, a compact and sanitized copy of the original Monday floor-plan template (the venue grid, styles, landmarks, and blank staffing boxes retained; unused employee reference data omitted). On export it clones that master sheet into Monday–Sunday and plots events onto the original bay cells. For a **full-fidelity export with all additional original workbook tabs**, select **Excel master** and choose your complete blank .xlsx template before exporting. The file is used locally; your original is never overwritten.
 
 Browser session event edits are saved in local storage; imported PDFs and original XLSX files themselves are not saved or transmitted. Re-upload the XLSX master after reloading if you need complete template fidelity.
 
