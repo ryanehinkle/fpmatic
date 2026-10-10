@@ -91,6 +91,7 @@ assert(insertedMerges.includes("E4:H5"),"First event merge should cover 2 rows")
 assert(insertedMerges.includes("E6:H7"),"Second event should follow immediately");
 assert(!insertedMerges.some(m=>m==="E7:H8"||m==="E8:H9"),"Incorrect gap placement");
 for(const pathname of Object.keys(originalZip.files)){
+ if(originalZip.files[pathname].dir)continue;
  if(pathname==="xl/styles.xml"||/^xl\/worksheets\/sheet[1-7]\.xml$/.test(pathname))continue;
  assert.deepEqual(
    new Uint8Array(await outputZip.file(pathname).async("uint8array")),
