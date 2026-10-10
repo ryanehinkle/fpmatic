@@ -1,6 +1,6 @@
 import {exportExactFloorPlan} from "./excel-export.js?v=20261010d";
-import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
-pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261010e";
+let pdfjsLib=null;
 
 const $=id=>document.getElementById(id);
 const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
@@ -138,6 +138,10 @@ function eventFromPages(pages,beo,file){
   return {id:"beo-"+beo,beo,name:shortName(name),date,start:times?times[0]:"",end:times?times[1]:"",golfStart:golf&&times&&(golf[0]!==times[0]||golf[1]!==times[1])?golf[0]:"",golfEnd:golf&&times&&(golf[0]!==times[0]||golf[1]!==times[1])?golf[1]:"",guests:countMatch?Number(countMatch[0]):null,bays,category:x.category,package:x.package,status,space,source:file};
 }
 async function parsePdf(file){
+  if(!pdfjsLib){
+    pdfjsLib=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs");
+    pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+  }
   const bytes=new Uint8Array(await file.arrayBuffer());
   const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
   const byBEO=new Map();let previous="";
@@ -166,6 +170,7 @@ function timeCollision(a,b){
 }
 function validation(e){
   const issues=[];
+  if(e.importFlags)for(const flag of e.importFlags)if(!/No bay assignment|Missing event date or time/.test(flag))issues.push(flag);
   if(!e.date)issues.push("Missing event date");
   if(!e.start||!e.end)issues.push("Missing event time");
   if(!baySegments(e.bays).length)issues.push("Missing or invalid bay assignment");
@@ -297,6 +302,54 @@ function saveEditor(){
   else{data.id="manual-"+Date.now()+"-"+Math.random().toString(36).slice(2,5);state.events.push(data)}
   state.week=weekOf(data.date);state.day=(localDate(data.date).getDay()+6)%7;closeEditor();notify("Event saved");
 }
+
+const csvFiles={staffing:null,menus:null};
+async function registerCsvFile(file,requestedType){
+  if(!file)return;
+  if(!/\.csv$/i.test(file.name))throw new Error("Please choose a CSV report");
+  const rows=parseCsv(await file.text()),type=reportType(rows);
+  if(requestedType&&requestedType!==type)throw new Error("That file is "+(type==="menus"?"Catering Menus":"Event Staffing")+", not "+(requestedType==="menus"?"Catering Menus":"Event Staffing"));
+  csvFiles[type]={file,rows};
+  const ready=Boolean(csvFiles.staffing&&csvFiles.menus);
+  const set=(type,id,box)=>{
+    const picked=csvFiles[type];$(id).textContent=picked?picked.file.name:"Choose CSV";
+    $(box).classList.toggle("ready",Boolean(picked));
+  };
+  set("staffing","staffFileName","staffBox");set("menus","menuFileName","menuBox");
+  $("buildFromReports").disabled=!ready;
+  $("reportFeedback").textContent=ready?"":"Select both reports.";
+  if($("workspace").hidden===false)notify(ready?"Reports ready — build to update floor plan":"Report selected — upload the other CSV");
+}
+async function acceptCsvFiles(files,autoBuild=false){
+  try{
+    for(const file of Array.from(files||[]))await registerCsvFile(file);
+    if(csvFiles.staffing&&csvFiles.menus&&autoBuild)await runCsvReports();
+  }catch(error){
+    console.error("CSV import error",error);
+    $("reportFeedback").textContent=error.message||String(error);
+    notify("CSV: "+(error.message||String(error)));
+  }
+}
+async function runCsvReports(){
+  if(!csvFiles.staffing||!csvFiles.menus)return notify("Choose Event Staffing and Catering Menus");
+  const btn=$("buildFromReports");btn.disabled=true;btn.textContent="Building…";
+  try{
+    const incoming=buildEvents(csvFiles.staffing.rows,csvFiles.menus.rows,csvFiles.staffing.file.name,csvFiles.menus.file.name);
+    if(!incoming.events.length)throw new Error("No events found in Event Staffing");
+    state.events=incoming.events;
+    state.files=[csvFiles.staffing.file.name,csvFiles.menus.file.name];
+    const dates=incoming.events.filter(e=>e.date).map(e=>e.date).sort();
+    state.week=dates.length?weekOf(dates[0]):weekOf(isoDate(new Date()));
+    state.day=0;state.selection="";
+    $("eventSearch").value="";$("eventFilter").value="all";
+    render();
+    notify(incoming.events.length+" events · "+incoming.matched+" catering matches"+(incoming.unmatched.length?" · "+incoming.unmatched.length+" unmatched menus":""));
+  }catch(error){
+    console.error("FPmatic report build failed",error);
+    $("reportFeedback").textContent=error.message||String(error);
+    notify(error.message||String(error));
+  }finally{btn.textContent="Build floor plan";btn.disabled=false}
+}
 async function importFiles(files){
   const all=[...files].filter(f=>/\.pdf$/i.test(f.name));if(!all.length)return notify("Choose PDF files");
   $("newUpload").disabled=true;
@@ -339,14 +392,19 @@ async function exportWorkbook(){
     button.textContent=originalText;
   }
 }
-$("dropzone").addEventListener("click",()=>$("pdfInput").click());
-$("dropzone").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();$("pdfInput").click()}});
-for(const ev of ["dragenter","dragover"]){$("dropzone").addEventListener(ev,e=>{e.preventDefault();$("dropzone").classList.add("drag")})}
-for(const ev of ["dragleave","drop"]){$("dropzone").addEventListener(ev,e=>{e.preventDefault();$("dropzone").classList.remove("drag")})}
-$("dropzone").addEventListener("drop",e=>importFiles(e.dataTransfer.files));
+$("staffInput").addEventListener("change",async e=>{try{await registerCsvFile(e.target.files[0],"staffing")}catch(error){$("reportFeedback").textContent=error.message;notify(error.message)}e.target.value=""});
+$("menuInput").addEventListener("change",async e=>{try{await registerCsvFile(e.target.files[0],"menus")}catch(error){$("reportFeedback").textContent=error.message;notify(error.message)}e.target.value=""});
+$("csvInput").addEventListener("change",async e=>{await acceptCsvFiles(e.target.files,true);e.target.value=""});
+$("buildFromReports").addEventListener("click",runCsvReports);
+$("newUpload").addEventListener("click",()=>$("csvInput").click());
+$("beoLanding").addEventListener("click",()=>$("pdfInput").click());
+$("beoUpload").addEventListener("click",()=>$("pdfInput").click());
 $("pdfInput").addEventListener("change",e=>importFiles(e.target.files));
-$("newUpload").addEventListener("click",()=>$("pdfInput").click());
-$("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.master=null;try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
+const drop=$("reportsDropzone");
+for(const ev of ["dragenter","dragover"])drop.addEventListener(ev,e=>{e.preventDefault();for(const box of drop.querySelectorAll(".report-file"))box.classList.add("dragging")});
+for(const ev of ["dragleave","drop"])drop.addEventListener(ev,e=>{e.preventDefault();for(const box of drop.querySelectorAll(".report-file"))box.classList.remove("dragging")});
+drop.addEventListener("drop",e=>acceptCsvFiles(e.dataTransfer.files,false));
+$("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.master=null;csvFiles.staffing=null;csvFiles.menus=null;$("staffFileName").textContent="Choose CSV";$("menuFileName").textContent="Choose CSV";$("staffBox").classList.remove("ready");$("menuBox").classList.remove("ready");$("buildFromReports").disabled=true;$("reportFeedback").textContent="";try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
 $("templateInput").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;state.master=await file.arrayBuffer();$("templateFileName").textContent=file.name+" ready";notify("Original Excel master loaded for export");});
 $("export").addEventListener("click",exportWorkbook);
 $("prevWeek").addEventListener("click",()=>{state.week=addDays(state.week,-7);state.day=0;render()});
