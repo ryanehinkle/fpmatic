@@ -405,7 +405,9 @@ async function exportWorkbook(){
       const startRow=({3:4,2:20,1:36}[rec.range.floor])+(period(e)==="PM"?5:0)+rec.row;
       const endRow=startRow+rec.height-1;
       const c1=4+rec.range.start%100,c2=4+rec.range.end%100;
-      const style=baseStyle(color(e),{sz:rec.height===2?9.5:10.5,fontColor:e.status==="Tentative"&&e.category!=="Pleaser"?"#FFFFFF":"#161616"});
+      const style=baseStyle(color(e),{sz:rec.height===2?18:20,fontColor:e.status==="Tentative"&&e.category!=="Pleaser"?"#FFFFFF":"#000000"});
+      style.font.name="Calibri";
+      delete style.border;
       for(let y=startRow;y<=endRow;y++)for(let x=c1;x<=c2;x++)setCell(ws,cellName(x,y),"",style);
       const address=cellName(c1,startRow);
       setCell(ws,address,displayLines(e).join("\n"),style);
