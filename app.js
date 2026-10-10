@@ -365,9 +365,33 @@ function removeMasterPlots(ws){
   // The uploaded master is intentionally blank. Remove only prior FPmatic event ranges if re-exporting.
   if(!ws["!merges"])ws["!merges"]=[];
 }
-function exportWorkbook(){
+async function exportWorkbook(){
   if(!state.events.length)return;
-  const wb=state.master?XLSX.read(state.master,{type:"array",cellStyles:true,cellDates:true}):buildTemplate();
+  if(typeof XLSX==="undefined")return notify("Excel library could not load. Check your connection.");
+  let wb;
+  try {
+    if(state.master){
+      wb=XLSX.read(state.master,{type:"array",cellStyles:true,cellDates:true});
+    } else {
+      const response=await fetch("./master.xlsx",{cache:"force-cache"});
+      if(!response.ok)throw new Error("Built-in Excel template missing");
+      const buffer=await response.arrayBuffer();
+      wb=XLSX.read(buffer,{type:"array",cellStyles:true,cellDates:true});
+      const first=wb.Sheets.Monday;
+      if(!first)throw new Error("Built-in template is invalid");
+      for(const day of DAYS.slice(1)){
+        if(!wb.Sheets[day]){
+          const copy=JSON.parse(JSON.stringify(first));
+          wb.Sheets[day]=copy;
+          wb.SheetNames.push(day);
+        }
+      }
+    }
+  }catch(error){
+    console.warn("Falling back to template-derived workbook layout:",error);
+    wb=buildTemplate();
+    notify("Built-in master unavailable. Using the fallback floorplan layout.");
+  }
   const issues=[];
   for(let day=0;day<7;day++){
     const iso=addDays(state.week,day),events=weeksEvents().filter(e=>e.date===iso),lay=layoutDay(events);
