@@ -12,7 +12,7 @@ const COLOR={
   "Youth":{Definite:"#F4CCCC",Tentative:"#E06666"}
 };
 const STORAGE="fpmatic-v1";
-const state={events:[],week:"",day:0,selection:"",master:null,files:[],showBayNumbers:true,layout:null};
+const state={events:[],week:"",day:0,selection:"",master:null,masterName:"",files:[],showBayNumbers:true,layout:null};
 let noticeTimer;
 function notify(msg){$("toast").textContent=msg;$("toast").classList.add("visible");clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$("toast").classList.remove("visible"),3400)}
 function pad(n){return String(n).padStart(2,"0")}
@@ -256,7 +256,7 @@ function render(){
   const start=state.week,end=addDays(start,6),current=weeksEvents(),day=dayEvents();
   $("weekTitle").textContent=niceDate(start,{month:"long",day:"numeric"})+" – "+niceDate(end,{month:"long",day:"numeric",year:"numeric"});
   $("weekPickerLabel").textContent=niceDate(start)+" – "+niceDate(end);
-  $("fileSummary").textContent=state.files.length+" report"+(state.files.length===1?"":"s")+" · "+state.events.length+" events";
+  $("fileSummary").textContent=state.files.length+" report"+(state.files.length===1?"":"s")+" · "+state.events.length+" events"+(state.masterName?" · "+state.masterName:"");
   const issues=allIssues(),layout=layoutDay(day),missing=current.filter(e=>validation(e).length>0).length;
   $("statEvents").textContent=current.length;
   $("statPlotted").textContent=current.filter(e=>baySegments(e.bays).length>0).length;
@@ -406,8 +406,30 @@ const drop=$("reportsDropzone");
 for(const ev of ["dragenter","dragover"])drop.addEventListener(ev,e=>{e.preventDefault();for(const box of drop.querySelectorAll(".report-file"))box.classList.add("dragging")});
 for(const ev of ["dragleave","drop"])drop.addEventListener(ev,e=>{e.preventDefault();for(const box of drop.querySelectorAll(".report-file"))box.classList.remove("dragging")});
 drop.addEventListener("drop",e=>acceptCsvFiles(e.dataTransfer.files,false));
-$("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.master=null;csvFiles.staffing=null;csvFiles.menus=null;$("staffFileName").textContent="Choose CSV";$("menuFileName").textContent="Choose CSV";$("staffBox").classList.remove("ready");$("menuBox").classList.remove("ready");$("buildFromReports").disabled=true;$("reportFeedback").textContent="";try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
-$("templateInput").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;state.master=await file.arrayBuffer();$("templateFileName").textContent=file.name+" ready";notify("Original Excel master loaded for export");});
+$("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.master=null;state.masterName="";$("masterPicker").textContent="Excel master";$("masterPicker").title="Load an existing Excel floor plan";csvFiles.staffing=null;csvFiles.menus=null;$("staffFileName").textContent="Choose CSV";$("menuFileName").textContent="Choose CSV";$("staffBox").classList.remove("ready");$("menuBox").classList.remove("ready");$("buildFromReports").disabled=true;$("reportFeedback").textContent="";try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
+$("templateInput").addEventListener("change",async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+    if(!/\.xlsx$/i.test(file.name))throw new Error("Choose an .xlsx floor plan");
+    const bytes=await file.arrayBuffer();
+    if(typeof JSZip!=="function")throw new Error("Excel reader is unavailable");
+    const zip=await JSZip.loadAsync(bytes,{checkCRC32:true});
+    if(!zip.file("xl/styles.xml"))throw new Error("Invalid Excel formatting");
+    for(let day=1;day<=7;day++){
+      const sheet=zip.file("xl/worksheets/sheet"+day+".xml");
+      if(!sheet)throw new Error("Master needs Monday–Sunday worksheets");
+      const xml=await sheet.async("string");
+      if(!/<mergeCells\b/.test(xml))throw new Error("Missing floor-plan merges on sheet "+day);
+    }
+    state.master=bytes;state.masterName=file.name;
+    $("masterPicker").textContent="✓ Excel master";
+    $("masterPicker").title=file.name+" — loaded for export";
+    render();
+    notify("Excel master loaded: "+file.name);
+  }catch(error){
+    notify("Master not loaded: "+(error.message||String(error)));
+  }finally{e.target.value="";}
+});
 $("export").addEventListener("click",exportWorkbook);
 $("prevWeek").addEventListener("click",()=>{state.week=addDays(state.week,-7);state.day=0;render()});
 $("nextWeek").addEventListener("click",()=>{state.week=addDays(state.week,7);state.day=0;render()});
