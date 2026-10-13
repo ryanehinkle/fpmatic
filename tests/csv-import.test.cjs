@@ -40,4 +40,14 @@ const noBays=byName("Missing Bays");assert.equal(noBays.bays,"");assert(noBays.i
 assert.equal(byName("Flex Event").category,"Flex");
 assert.equal(parseCsv('"A","B"\r\n"one, two","quoted ""value"""\r\n')[0].B,'quoted "value"');
 assert.throws(()=>reportType(parseCsv("Unknown,Another\n1,2")),/Unrecognized CSV/);
+
+const more=[
+ '"3:00 PM","Definite","80","201-208","Signature Room North","12:00 PM","3:00 PM","10/18/2026","12:00 PM","Full Rooms Event - Contact - 10.18.26"',
+ '"3:00 PM","Definite","80","201-208","Signature Room South","12:00 PM","3:00 PM","10/18/2026","12:00 PM","Full Rooms Event - Contact - 10.18.26"',
+ '"1:00 PM","Definite","12","133-134","Event Golf Bays","9:00 AM","1:00 PM","10/18/2026","9:00 AM","Tom's Lessons - Contact - 10.18.26"'
+].join("\n");
+const merged=buildEvents(parseCsv(staffingCsv+"\n"+more),menus);
+assert.equal(merged.events.length,6,"Only the Full Sig event should be added, not Tom's Lessons");
+assert.equal(merged.events.find(x=>x.name==="Full Rooms Event").space,"Full Sig");
+assert(!merged.events.some(x=>x.name==="Tom's Lessons"));
 console.log("PASS — CSV joins, package colors, duplicate product rows, bay assignments, room/golf hours, tentative statuses, and missing-bay warnings.");
