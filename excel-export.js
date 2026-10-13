@@ -199,7 +199,7 @@ function insertMissingCells(xml,missing){
     }
     return opening+updated+closing;
   });
-  if(processed.size!==rows.size)throw new Error("The master is missing an expected bay row");
+  if(processed.size!==rows.size)throw new Error("The master is missing an expected bay row: "+[...rows.keys()].filter(k=>!processed.has(k)).join(", "));
   return xml;
 }
 function plotSheet(xml,events,layout,styleIds,period,displayLines){
