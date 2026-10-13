@@ -325,6 +325,18 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
   return {xml,count:placements.length,skipped};
 }
 
+function renameWeeklyTabs(xml,weekStart,addDays){
+  // Change names only, never worksheet identities or ordering.
+  return xml.replace(/<sheet\b[^>]*\/>/g,(tag)=>{
+    const name=(tag.match(/\bname="([^"]+)"/)||[])[1];
+    const day=DAYS.indexOf(name);
+    if(day<0)return tag;
+    const date=addDays(weekStart,day);
+    const parts=date.split("-");
+    const label=name+" "+Number(parts[1])+"."+parts[2];
+    return tag.replace(/\bname="[^"]+"/,'name="'+xmlEscape(label)+'"');
+  });
+}
 function formatDownloadDate(date){
   const [year,month,day]=date.split("-");
   return month+"."+day+"."+year.slice(-2);
@@ -359,6 +371,10 @@ export async function exportExactFloorPlan({state,weekEvents,layoutDay,period,di
     modified.set(path,xml);
     count+=dayCount;
   }
+  const workbookFile=zip.file("xl/workbook.xml");
+  if(!workbookFile)throw new Error("Excel master is missing the worksheet names");
+  const workbookXml=await workbookFile.async("string");
+  zip.file("xl/workbook.xml",renameWeeklyTabs(workbookXml,state.week,addDays));
   zip.file("xl/styles.xml",finalize(updatedStyles));
   for(const [path,xml] of modified)zip.file(path,xml);
   const result=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
