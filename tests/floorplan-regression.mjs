@@ -85,7 +85,7 @@ function border(xml,cellRef,sheetXml){
  return borders[id];
 }
 function side(borderXml,name){
- return (borderXml.match(new RegExp("<"+name+"\\b[^>]*style=\\"([^\\"]+)\\""))||[])[1]||"";
+ return (borderXml.match(new RegExp('<'+name+'\\b[^>]*style="([^"]+)"'))||[])[1]||"";
 }
 // Only the perimeter of each event is drawn; outer-floor lines remain heavier.
 assert.equal(side(border(newStyles,"E4",newSheet),"left"),"medium");
