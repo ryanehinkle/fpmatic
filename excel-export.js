@@ -199,7 +199,16 @@ function insertMissingCells(xml,missing){
     }
     return opening+updated+closing;
   });
-  if(processed.size!==rows.size)throw new Error("The master is missing an expected bay row: "+[...rows.keys()].filter(k=>!processed.has(k)).join(", "));
+  // A blank row may be omitted entirely by Excel. Create only that row,
+  // keeping every pre-existing row, height and grid style byte-for-byte.
+  for(const [row,additions] of rows){
+    if(processed.has(row))continue;
+    additions.sort((a,b)=>a.column-b.column);
+    const markup='<row r="'+row+'">'+additions.map(item=>item.text).join("")+'</row>';
+    const next=[...xml.matchAll(/<row\\b[^>]*\\br="(\\d+)"[^>]*>/g)].find(m=>Number(m[1])>row);
+    if(next)xml=xml.slice(0,next.index)+markup+xml.slice(next.index);
+    else xml=xml.replace('</sheetData>',markup+'</sheetData>');
+  }
   return xml;
 }
 function plotSheet(xml,events,layout,styleIds,period,displayLines){
