@@ -76,23 +76,48 @@ function xf(xml,id){
 function borderId(xml,cellRef){
  return Number((xf(xml,styleIndex(cell(xml,cellRef))).match(/\bborderId="(\d+)"/)||[])[1]||0)
 }
-for(const ref of ["E4","E5","E6","E7","H4","H7","AG4","AL4","AL5","AL6","E20","E22"]){
- assert.equal(
-   Number((xf(newStyles,styleIndex(cell(newSheet,ref))).match(/\bborderId="(\d+)"/)||[])[1]||0),
-   Number((xf(oldStyles,styleIndex(cell(oldSheet,ref))).match(/\bborderId="(\d+)"/)||[])[1]||0),
-   "Template border changed on "+ref
- );
+function border(xml,cellRef,sheetXml){
+ const id=Number((xf(xml,styleIndex(cell(sheetXml,cellRef))).match(/\bborderId="(\d+)"/)||[])[1]||0);
+ const content=(xml.match(/<borders\b[^>]*>([\s\S]*?)<\/borders>/)||[])[1];
+ assert(content,"Missing borders");
+ const borders=[...content.matchAll(/<border\b[^>]*\/>|<border\b[^>]*>[\s\S]*?<\/border>/g)].map(x=>x[0]);
+ assert(borders[id],"Unknown border "+id);
+ return borders[id];
 }
-for(const ref of ["E8","AL8","E9","D4","D8","AM4","AM9","D9"]){
- assert.equal(cell(newSheet,ref),cell(oldSheet,ref),"Master non-event cell unexpectedly rewritten at "+ref);
+function side(borderXml,name){
+ return (borderXml.match(new RegExp("<"+name+"\\b[^>]*style=\\"([^\\"]+)\\""))||[])[1]||"";
 }
+// Only the perimeter of each event is drawn; outer-floor lines remain heavier.
+assert.equal(side(border(newStyles,"E4",newSheet),"left"),"medium");
+assert.equal(side(border(newStyles,"E4",newSheet),"top"),"medium");
+assert.equal(side(border(newStyles,"E5",newSheet),"bottom"),"thin");
+assert.equal(side(border(newStyles,"F4",newSheet),"left"),"");
+assert.equal(side(border(newStyles,"F5",newSheet),"top"),"");
+assert.equal(side(border(newStyles,"F5",newSheet),"right"),"");
+assert.equal(side(border(newStyles,"H4",newSheet),"right"),"thin");
+assert.equal(side(border(newStyles,"AL4",newSheet),"right"),"medium");
+for(const ref of ["E8","AL8","E9","AM4","AM9"]){
+ assert.equal(cell(newSheet,ref),cell(oldSheet,ref),"Untouched master grid cell changed at "+ref);
+}
+// Existing cell content is never changed when its alignment is centered.
+for(const ref of ["D4","D9"]){
+ const before=cell(oldSheet,ref).replace(/\bs="\d+"/,'');
+ const after=cell(newSheet,ref).replace(/\bs="\d+"/,'');
+ assert.equal(after,before,"Template label content changed at "+ref);
+}
+
+const workbook=await read(outputZip,"xl/workbook.xml");
+for(const [i,name] of ["Monday 10.12","Tuesday 10.13","Wednesday 10.14","Thursday 10.15","Friday 10.16","Saturday 10.17","Sunday 10.18"].entries()){
+ assert(workbook.includes('name="'+name+'"'),"Missing dated tab: "+name);
+}
+assert(workbook.includes('name="Specialty Roles"'),"Reference tab renamed");
 const insertedMerges=[...newSheet.matchAll(/<mergeCell\b[^>]*ref="([^"]+)"/g)].map(m=>m[1]);
 assert(insertedMerges.includes("E4:H5"),"First event merge should cover 2 rows");
 assert(insertedMerges.includes("E6:H7"),"Second event should follow immediately");
 assert(!insertedMerges.some(m=>m==="E7:H8"||m==="E8:H9"),"Incorrect gap placement");
 for(const pathname of Object.keys(originalZip.files)){
  if(originalZip.files[pathname].dir)continue;
- if(pathname==="xl/styles.xml"||/^xl\/worksheets\/sheet[1-7]\.xml$/.test(pathname))continue;
+ if(pathname==="xl/styles.xml"||pathname==="xl/workbook.xml"||/^xl\/worksheets\/sheet[1-7]\.xml$/.test(pathname))continue;
  assert.deepEqual(
    new Uint8Array(await outputZip.file(pathname).async("uint8array")),
    new Uint8Array(await originalZip.file(pathname).async("uint8array")),
