@@ -12,6 +12,12 @@ There is also a small **Use BEO PDF instead** option, preserved as an alternativ
 
 All data stays in the browser. Imported report content is not transmitted to GitHub or any server. The selected report filenames and event records are persisted in browser local storage; CSV contents are not committed to the public repository.
 
+### Existing weekly Excel masters
+
+Use **Excel master** (top right) to select an existing Monday–Sunday floorplan XLSX, including weeks where bay sections have already been merged or some events have been filled in. The selected filename is shown in the header. FPmatic splits blank merged sections around new events and merges the remaining blank areas, preserving their original outlines, widths, heights, tabs, and staffing content. Already-occupied event sections are never overwritten; any skipped events are reported at export.
+
+Combined Signature North/South is labeled **Full Sig**, all tentative event lettering is black, and **Tom's Lessons** is intentionally ignored.
+
 ### Floor-plan rules
 
 - 102 bays: first floor 101–134, second 201–234, third 301–334.
