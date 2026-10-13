@@ -83,7 +83,9 @@ function recolorStyles(xml){
     if(borderCache.has(key))return borderCache.get(key);
     const xmlBorder='<border>'+names.map(name=>{
       const style=sides[name];
-      return style?'<'+name+' style="'+style+'"><color rgb="FF000000"/></'+name+'>':'<'+name+'/>';
+      const lineStyle=style==="light"?"thin":style;
+      const lineColor=style==="light"?"FFD9D9D9":"FF000000";
+      return style?'<'+name+' style="'+lineStyle+'"><color rgb="'+lineColor+'"/></'+name+'>':'<'+name+'/>';
     }).join("")+'<diagonal/></border>';
     const id=originalBorders.length+addedBorders.length;
     addedBorders.push(xmlBorder);
@@ -247,16 +249,32 @@ function insertMissingCells(xml,missing){
   }
   return xml;
 }
-function sectionBorder(area,x,y){
-  // Thin outline for each section; heavier, uninterrupted floor and AM/PM boundaries.
-  // No internal cell borders inside any newly merged event/blank section.
+function sectionBorder(area,x,y,originalSection=null,isEvent=false){
+  // The original merged section owns its outline, not each new fragment.
+  // Cutting a blank merge around an event must NOT create black internal lines.
+  // Event edges are pale gray, like the spreadsheet's ordinary gridlines.
   const floorTops=[4,9,20,25,36,41],floorBottoms=[8,13,24,29,40,45];
-  return {
-    left:x===area.c1?(x===5?"medium":"thin"):null,
-    right:x===area.c2?(x===38?"medium":"thin"):null,
-    top:y===area.r1?(floorTops.includes(y)?"medium":"thin"):null,
-    bottom:y===area.r2?(floorBottoms.includes(y)?"medium":"thin"):null
+  const sides={left:null,right:null,top:null,bottom:null};
+  const external={
+    left:x===5,right:x===38,
+    top:floorTops.includes(y),bottom:floorBottoms.includes(y)
   };
+  const eventEdge={
+    left:x===area.c1,right:x===area.c2,
+    top:y===area.r1,bottom:y===area.r2
+  };
+  for(const side of ["left","right","top","bottom"]){
+    if(external[side]){sides[side]="medium";continue}
+    const originalEdge=originalSection&&({
+      left:x===originalSection.c1,right:x===originalSection.c2,
+      top:y===originalSection.r1,bottom:y===originalSection.r2
+    })[side];
+    // Preserve existing section dividers, but never run them through the
+    // middle of a colored event that crosses an old section boundary.
+    if(originalEdge&&(!isEvent||eventEdge[side])){sides[side]="thin";continue}
+    if(isEvent&&eventEdge[side])sides[side]="light";
+  }
+  return sides;
 }
 function centerExistingText(xml,styleIds){
   // Keep pre-entered text (including rotated MOD names), but center its alignment.
@@ -309,18 +327,22 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
       if(occupied.has(address))throw new Error("Two imported events overlap at "+address);
       occupied.add(address);
       eventCells.set(address,{event,compact:rec.height===2,
-        area:box,text:y===box.r1&&x===box.c1?displayLines(event).join("\n"):null});
+        area:box,originalSection:null,text:y===box.r1&&x===box.c1?displayLines(event).join("\n"):null});
     }
     placements.push(box);
   }
   if(!placements.length)return {xml,count:0,skipped};
   const newMerges=[];
   const leftoverAreas=[];
+  const leftoverOrigins=new Map();
   for(const original of originalMerges){
     let parts=[original.area];
     for(const placed of placements)parts=parts.flatMap(part=>subtractRectangle(part,placed));
     const changed=parts.length!==1||!parts.length||reference(parts[0])!==reference(original.area);
-    if(changed)leftoverAreas.push(...parts);
+    if(changed){
+      leftoverAreas.push(...parts);
+      for(const part of parts)leftoverOrigins.set(reference(part),original.area);
+    }
     for(const p of parts)if(isMergedRectangle(p))newMerges.push(reference(p));
   }
   for(const placed of placements)if(isMergedRectangle(placed))newMerges.push(reference(placed));
@@ -340,7 +362,7 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
     if(!relevant)continue;
     for(let row=area.r1;row<=area.r2;row++)for(let col=area.c1;col<=area.c2;col++){
       const address=colName(col)+row;
-      if(!eventCells.has(address))sectionCells.set(address,{area,event:null,compact:false,text:null});
+      if(!eventCells.has(address))sectionCells.set(address,{area,originalSection:leftoverOrigins.get(reference(area))||null,event:null,compact:false,text:null});
     }
   }
   const changes=new Map([...sectionCells,...eventCells]);
@@ -370,7 +392,8 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
   const missing=new Map(),rewritten=new Set();
   function cellXml(address,change){
     const loc=location(address);
-    const sides=sectionBorder(change.area,loc.c,loc.r);
+    const source=change.originalSection||(change.event?originalMerges.find(m=>intersection(m.area,{c1:loc.c,c2:loc.c,r1:loc.r,r2:loc.r}))?.area:null);
+    const sides=sectionBorder(change.area,loc.c,loc.r,source,Boolean(change.event));
     const base=baseStyle(address);
     const id=change.event?styleIds.resolve(base,change.event,change.compact,sides):styleIds.blank(base,sides);
     const style=String(id);
