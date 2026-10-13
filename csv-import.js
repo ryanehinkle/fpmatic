@@ -74,7 +74,7 @@ function opportunityTitle(name){
   const stripped=String(name||"").replace(/\s*-\s*\d{1,2}[./]\d{1,2}[./]\d{2,4}\s*$/,"").trim();
   const parts=stripped.split(/\s+-\s+/);
   if(parts.length>1)parts.pop();
-  return (parts.join(" - ")||stripped||String(name)).trim();
+  return (parts.join(" - ")||stripped||String(name)).trim().replace(/([A-Za-z])\?s\b/g,"$1\u0027s");
 }
 function findSpace(staff,menus){
   const products=staff.map(r=>r["Product Name"]||"").join(" | ");
