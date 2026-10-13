@@ -247,8 +247,33 @@ function insertMissingCells(xml,missing){
   }
   return xml;
 }
+function sectionBorder(area,x,y){
+  // Thin outline for each section; heavier, uninterrupted floor and AM/PM boundaries.
+  // No internal cell borders inside any newly merged event/blank section.
+  const floorTops=[4,9,20,25,36,41],floorBottoms=[8,13,24,29,40,45];
+  return {
+    left:x===area.c1?(x===5?"medium":"thin"):null,
+    right:x===area.c2?(x===38?"medium":"thin"):null,
+    top:y===area.r1?(floorTops.includes(y)?"medium":"thin"):null,
+    bottom:y===area.r2?(floorBottoms.includes(y)?"medium":"thin"):null
+  };
+}
+function centerExistingText(xml,styleIds){
+  // Keep pre-entered text (including rotated MOD names), but center its alignment.
+  // Do not alter the original rotation, value, formula, merged range or border.
+  return xml.replace(/<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*?\/>|<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*>[\s\S]*?<\/c>/g,(original,emptyRef,filledRef)=>{
+    const ref=emptyRef||filledRef;
+    if(!/\bt="(?:s|inlineStr|str)"/.test(original)||!/<(?:is|v)\b/.test(original))return original;
+    const pos=location(ref);
+    if(pos.r>47||pos.c>39)return original;
+    const base=Number((original.match(/\bs="(\d+)"/)||[])[1]||0);
+    const center=styleIds.center(base);
+    return original.replace(/(<c\b[^>]*?)\bs="\d+"/,'$1s="'+center+'"');
+  });
+}
 function plotSheet(xml,events,layout,styleIds,period,displayLines){
   const records=Object.values(layout.records).flat().filter(rec=>rec.row>=0);
+  xml=centerExistingText(xml,styleIds);
   if(!records.length)return {xml,count:0,skipped:[]};
   const originalCells=readCells(xml);
   const gridStyles=[...originalCells].map(([ref,cell])=>({ref,cell,...location(ref)})).filter(x=>x.c>=5&&x.c<=38&&x.r>=4&&x.r<=45);
@@ -284,7 +309,7 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
       if(occupied.has(address))throw new Error("Two imported events overlap at "+address);
       occupied.add(address);
       eventCells.set(address,{event,compact:rec.height===2,
-        text:y===box.r1&&x===box.c1?displayLines(event).join("\n"):null});
+        area:box,text:y===box.r1&&x===box.c1?displayLines(event).join("\n"):null});
     }
     placements.push(box);
   }
@@ -306,6 +331,19 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
     if(scan.has(m))throw new Error("Duplicate Excel merge "+m);
     scan.add(m);
   }
+  // Blank remnants of a previously merged bay section must be realigned and
+  // outlined too. Otherwise the old individual cell-grid borders remain visible.
+  const sectionCells=new Map();
+  for(const area of leftoverAreas){
+    const relevant=area.c1>=5&&area.c2<=38&&
+      [4,9,20,25,36,41].some(top=>area.r1>=top&&area.r2<=top+4);
+    if(!relevant)continue;
+    for(let row=area.r1;row<=area.r2;row++)for(let col=area.c1;col<=area.c2;col++){
+      const address=colName(col)+row;
+      if(!eventCells.has(address))sectionCells.set(address,{area,event:null,compact:false,text:null});
+    }
+  }
+  const changes=new Map([...sectionCells,...eventCells]);
   // Find the nearest existing template style, preferably on the same edge of
   // the old merged region. This handles absent <c> nodes in premerged blocks.
   function baseStyle(address){
@@ -331,18 +369,22 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
   }
   const missing=new Map(),rewritten=new Set();
   function cellXml(address,change){
-    const style=String(styleIds.resolve(baseStyle(address),change.event,change.compact));
+    const loc=location(address);
+    const sides=sectionBorder(change.area,loc.c,loc.r);
+    const base=baseStyle(address);
+    const id=change.event?styleIds.resolve(base,change.event,change.compact,sides):styleIds.blank(base,sides);
+    const style=String(id);
     if(change.text===null)return '<c r="'+address+'" s="'+style+'"/>';
     return '<c r="'+address+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEscape(change.text)+'</t></is></c>';
   }
   const cellRe=/<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*?\/>|<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*>[\s\S]*?<\/c>/g;
   xml=xml.replace(cellRe,(whole,short,long)=>{
-    const ref=short||long,change=eventCells.get(ref);
+    const ref=short||long,change=changes.get(ref);
     if(!change)return whole;
     rewritten.add(ref);
     return cellXml(ref,change);
   });
-  for(const [ref,change] of eventCells)if(!rewritten.has(ref))missing.set(ref,cellXml(ref,change));
+  for(const [ref,change] of changes)if(!rewritten.has(ref))missing.set(ref,cellXml(ref,change));
   // Rebuild a blank anchor when the original merged section's anchor was
   // covered by an event and the adjacent remainder needs its own merge anchor.
   for(const area of leftoverAreas){
