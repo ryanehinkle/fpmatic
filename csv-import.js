@@ -82,7 +82,7 @@ function findSpace(staff,menus){
   const south=/Signature Room South|Sig(?:nature)?\s*Room\s*S\b/i.test(products)||/Signature South|Sig Room S\b/i.test(location);
   const north=/Signature Room North|Sig(?:nature)?\s*Room\s*N\b/i.test(products)||/Signature North|Sig Room N\b/i.test(location);
   const out=[];
-  if(north&&south)out.push("Sig N+S");else if(north)out.push("Sig N");else if(south)out.push("Sig S");
+  if(north&&south)out.push("Full Sig");else if(north)out.push("Sig N");else if(south)out.push("Sig S");
   if(/\bLower Lounge\b/i.test(products))out.push("LL");
   if(/\bUpper Lounge\b/i.test(products))out.push("UL");
   if(/\bTerrace\b/i.test(products))out.push("Terrace");
@@ -123,6 +123,7 @@ export function buildEvents(staffingRows,menuRows,staffFile="Event Staffing.csv"
   }
   const events=[];
   for(const [op,rows] of groups){
+    if(/^Tom['’]s Lessons(?:\s*-|\s*$)/i.test(op.trim()))continue;
     const menus=catering.get(op)||[];
     const date=mostCommon(rows.map(r=>isoDate(r["Event Date"])));
     const start=clock(mostCommon(rows.map(r=>r["Event Start Time"])));
