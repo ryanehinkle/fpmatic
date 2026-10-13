@@ -32,7 +32,8 @@ function period(e){return isPM(e)?"PM":"AM"}
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function shortName(s){return String(s||"").replace(/\s*[-–]\s*\d\d?[./-]\d\d?[./-]\d{2,4}\s*$/,"").trim()}
 function displayLines(e){
-  const out=[e.name||"Unnamed event",(e.space?e.space+" ":"")+fmtRange(e.start,e.end)];
+  const displayedSpace=(e.space||"").replace(/Sig N\+S/gi,"Full Sig");
+  const out=[e.name||"Unnamed event",(displayedSpace?displayedSpace+" ":"")+fmtRange(e.start,e.end)];
   if(e.golfStart&&e.golfEnd&&(clockMin(e.golfStart)!==clockMin(e.start)||clockMin(e.golfEnd)!==clockMin(e.end)))out.push("Golf "+fmtRange(e.golfStart,e.golfEnd));
   out.push((e.guests===null||e.guests===undefined||e.guests==="")?"NA ppl":String(e.guests)+"ppl");
   if(e.package)out.push(e.package);
@@ -82,7 +83,7 @@ function spaceFrom(text,header){
   const lower=/Lower Lounge/i.test(search);
   const upper=/Upper Lounge/i.test(search);
   const terrace=/(?:Terrace)\s*(?:-|Hourly|Rental|$)/im.test(search)&&/Terrace/i.test(header+text.slice(0,2200));
-  const p=[];if(north&&south)p.push("Sig N+S");else if(north)p.push("Sig N");else if(south)p.push("Sig S");
+  const p=[];if(north&&south)p.push("Full Sig");else if(north)p.push("Sig N");else if(south)p.push("Sig S");
   if(lower)p.push("LL");if(upper)p.push("UL");if(terrace)p.push("Terrace");
   return p.join(", ");
 }
@@ -161,7 +162,7 @@ async function parsePdf(file){
   return out;
 }
 function persist(){try{localStorage.setItem(STORAGE,JSON.stringify({events:state.events,week:state.week,day:state.day,files:state.files}))}catch(e){/* local storage may be disabled */}}
-function restore(){try{const d=JSON.parse(localStorage.getItem(STORAGE)||"null");if(d&&Array.isArray(d.events)){state.events=d.events;state.week=d.week;state.day=d.day||0;state.files=d.files||[]}}catch(e){}}
+function restore(){try{const d=JSON.parse(localStorage.getItem(STORAGE)||"null");if(d&&Array.isArray(d.events)){state.events=d.events.filter(e=>!/^Tom[\u0027\u2019]s Lessons$/i.test(String(e.name||"").trim()));state.week=d.week;state.day=d.day||0;state.files=d.files||[]}}catch(e){}}
 function overlaps(a,b){return a.start<=b.end&&b.start<=a.end}
 function timeCollision(a,b){
   const aa=clockMin(a.golfStart||a.start),ab=clockMin(a.golfEnd||a.end),ba=clockMin(b.golfStart||b.start),bb=clockMin(b.golfEnd||b.end);
@@ -236,7 +237,7 @@ function renderPeriod(floor,part,recordList){
     const lines=displayLines(e);
     const tiny=r.range.end-r.range.start<3||r.height===2;
     const hasConflict=allIssues().some(i=>i.event.id===e.id&&i.msg.startsWith("Bay/time conflict"));
-    return '<button type="button" class="event-plot'+(tiny?" plot-compact":"")+(e.status==="Tentative"?" tentative":"")+(state.selection===e.id?" selected":"")+(hasConflict?" conflict":"")+'" data-event="'+escapeHtml(e.id)+'" title="'+escapeHtml(e.name+" | "+r.range.start+"-"+r.range.end+" | "+fmtRange(e.start,e.end))+'" style="grid-column:'+(r.range.start%100)+' / '+(r.range.end%100+1)+';grid-row:'+(r.row+1)+' / span '+r.height+';background:'+color(e)+';color:'+(e.status==="Tentative"&&e.category!=="Pleaser"?"#fff":"#151515")+'">'+lines.map((t,i)=>'<span'+(i===0?' class="plot-name"':'')+'>'+escapeHtml(t)+'</span>').join("")+'</button>';
+    return '<button type="button" class="event-plot'+(tiny?" plot-compact":"")+(e.status==="Tentative"?" tentative":"")+(state.selection===e.id?" selected":"")+(hasConflict?" conflict":"")+'" data-event="'+escapeHtml(e.id)+'" title="'+escapeHtml(e.name+" | "+r.range.start+"-"+r.range.end+" | "+fmtRange(e.start,e.end))+'" style="grid-column:'+(r.range.start%100)+' / '+(r.range.end%100+1)+';grid-row:'+(r.row+1)+' / span '+r.height+';background:'+color(e)+';color:'+"#151515"+'">'+lines.map((t,i)=>'<span'+(i===0?' class="plot-name"':'')+'>'+escapeHtml(t)+'</span>').join("")+'</button>';
   }).join("");
   return '<div class="period-wrap"><div class="period-label '+part.toLowerCase()+'">'+part+'</div><div class="event-grid">'+plots+'</div></div>';
 }
@@ -296,7 +297,7 @@ function openEditor(id){
 }
 function closeEditor(){$("editorDialog").close();state.selection="";render()}
 function saveEditor(){
-  const data={name:$("editName").value.trim(),date:$("editDate").value,start:$("editStart").value,end:$("editEnd").value,golfStart:$("editGolfStart").value,golfEnd:$("editGolfEnd").value,guests:$("editGuests").value===""?null:+$("editGuests").value,bays:$("editBays").value.trim(),space:$("editSpace").value,package:$("editPackage").value.trim(),category:$("editCategory").value,status:$("editStatus").value};
+  const data={name:$("editName").value.trim(),date:$("editDate").value,start:$("editStart").value,end:$("editEnd").value,golfStart:$("editGolfStart").value,golfEnd:$("editGolfEnd").value,guests:$("editGuests").value===""?null:+$("editGuests").value,bays:$("editBays").value.trim(),space:$("editSpace").value.replace(/Sig N\+S/gi,"Full Sig"),package:$("editPackage").value.trim(),category:$("editCategory").value,status:$("editStatus").value};
   if(!data.name||!data.date||!data.start||!data.end)return notify("Event name, date, and times are required");
   if(!!data.golfStart!==!!data.golfEnd)return notify("Enter both golf times, or leave both blank");
   if(editId){Object.assign(state.events.find(e=>e.id===editId),data)}
@@ -337,7 +338,7 @@ async function runCsvReports(){
   try{
     const incoming=buildEvents(csvFiles.staffing.rows,csvFiles.menus.rows,csvFiles.staffing.file.name,csvFiles.menus.file.name);
     if(!incoming.events.length)throw new Error("No events found in Event Staffing");
-    state.events=incoming.events;
+    state.events=incoming.events.filter(e=>!/^Tom[\u0027\u2019]s Lessons$/i.test(e.name.trim()));
     state.files=[csvFiles.staffing.file.name,csvFiles.menus.file.name];
     const dates=incoming.events.filter(e=>e.date).map(e=>e.date).sort();
     state.week=dates.length?weekOf(dates[0]):weekOf(isoDate(new Date()));
@@ -358,7 +359,7 @@ async function importFiles(files){
   try{
     for(const file of all){
       notify("Reading "+file.name+"…");
-      const incoming=await parsePdf(file);
+      const incoming=(await parsePdf(file)).filter(e=>!/^Tom[\u0027\u2019]s Lessons$/i.test(e.name.trim()));
       for(const e of incoming){
         const ix=state.events.findIndex(x=>x.id===e.id);
         if(ix<0)state.events.push(e);else state.events[ix]=e;
