@@ -385,7 +385,11 @@ async function exportWorkbook(){
     const exported=await exportExactFloorPlan({
       state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays
     });
-    notify("Downloaded "+exported.filename+" — original master formatting preserved.");
+    if(exported.skipped?.length){
+      notify("Exported "+exported.filename+" · "+exported.skipped.length+" prefilled section(s) preserved");
+      console.warn("FPmatic kept already-filled master sections unchanged:",exported.skipped);
+      window.alert("These events were not overlaid because the Excel master already contains content in their sections:\n\n"+exported.skipped.join("\n"));
+    }else notify("Downloaded "+exported.filename+" — original master formatting preserved.");
   }catch(err){
     console.error("FPmatic exact-template export failed:",err);
     notify("Export failed: "+(err.message||String(err)));
