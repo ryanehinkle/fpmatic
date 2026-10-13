@@ -407,7 +407,7 @@ function renameWeeklyTabs(xml,weekStart,addDays){
   // Change names only, never worksheet identities or ordering.
   return xml.replace(/<sheet\b[^>]*\/>/g,(tag)=>{
     const name=(tag.match(/\bname="([^"]+)"/)||[])[1];
-    const day=DAYS.indexOf(name);
+    const day=DAYS.findIndex(d=>name===d||new RegExp("^"+d+" \\d{1,2}\\.\\d{1,2}$").test(name));
     if(day<0)return tag;
     const date=addDays(weekStart,day);
     const parts=date.split("-");
