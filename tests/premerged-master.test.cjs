@@ -38,6 +38,31 @@ const {plotSheet,recolorStyles}=vm.runInNewContext(source+"\n({plotSheet,recolor
   const count=+(rendered.xml.match(/<mergeCells count="(\d+)"/)||[])[1];
   assert.equal(count,merges.length,"Merge count mismatch");
   assert(rendered.xml.includes('<c r="D25"'),"AM/PM boundary changed");
+
+  // Section boundaries are dark ONLY where the uploaded master had them.
+  // Newly created leftover merge fragments must not get black cut lines.
+  function sideDetails(ref,side){
+    const cell=(rendered.xml.match(new RegExp('<c\\b(?=[^>]*\\br="'+ref+'")[^>]*\\/?>'))||[])[0];
+    assert(cell,"Missing modified cell "+ref);
+    const styleId=Number((cell.match(/\bs="(\d+)"/)||[])[1]);
+    const stylesheet=styled.finalize(styled.xml);
+    const xfs=[...(stylesheet.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/)||[])[1]
+      .matchAll(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g)].map(m=>m[0]);
+    const borderId=Number((xfs[styleId].match(/\bborderId="(\d+)"/)||[])[1]||0);
+    const borders=[...(stylesheet.match(/<borders\b[^>]*>([\s\S]*?)<\/borders>/)||[])[1]
+      .matchAll(/<border\b[^>]*\/>|<border\b[^>]*>[\s\S]*?<\/border>/g)].map(m=>m[0]);
+    const xml=borders[borderId]||"";
+    const tag=(xml.match(new RegExp("<"+side+"\\b[^>]*(?:\\/>|>[\\s\\S]*?<\\/"+side+">)"))||[])[0]||"";
+    return {style:(tag.match(/\bstyle="([^"]+)"/)||[])[1]||"",
+      color:(tag.match(/\brgb="([^"]+)"/)||[])[1]||""};
+  }
+  assert.equal(sideDetails("R25","right").style,"","No dark outline at the new left cut");
+  assert.equal(sideDetails("Y25","left").style,"","No dark outline at the new right cut");
+  assert.equal(sideDetails("P28","top").style,"","No dark divider above the bottom blank fragment");
+  assert.equal(sideDetails("S26","left").color,"FFD9D9D9","Event outlines must be pale gray");
+  assert.equal(sideDetails("X26","right").color,"FFD9D9D9","Event right edge must be pale gray");
+  assert.equal(sideDetails("P26","left").color,"FF000000","Original left section border lost");
+  assert.equal(sideDetails("AA26","right").color,"FF000000","Original right section border lost");
   // Tentative font should be black, not the former white override.
   const finalized=styled.finalize(styled.xml);
   const eventCell=(rendered.xml.match(/<c r="S25" s="(\d+)"/)||[])[1];
