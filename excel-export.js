@@ -101,7 +101,7 @@ function recolorStyles(xml){
       const category=COLORS[event.category]?event.category:"Flex";
       const tentative=event.status==="Tentative";
       const color=COLORS[category][tentative?1:0];
-      const white=tentative&&category!=="Pleaser";
+      const white=false; // All event text stays black, including tentative bookings.
       const fontId=fontIds[(compact?"compact":"normal")+(white?"White":"Black")];
       const fillId=colorToFill.get(color);
       const key=[baseIndex,fillId,fontId].join(":");
@@ -133,58 +133,187 @@ function rectToCell(range,baseRow){
   const colStart=4+range.start%100,colEnd=4+range.end%100;
   return {c1:colStart,c2:colEnd,r1:baseRow,r2:baseRow};
 }
-function plotSheet(xml,events,layout,styleIds,period,displayLines){
-  const assignments=new Map(),newMerges=[];
-  let assigned=0;
-  const ranges=Object.values(layout.records).flat();
-  for(const rec of ranges){
-    if(rec.row<0)continue;
-    const event=rec.event;
-    const p=period(event);
-    const base={3:4,2:20,1:36}[rec.range.floor];
-    if(!base)continue;
-    const r1=base+(p==="PM"?5:0)+rec.row,r2=r1+rec.height-1;
-    const c1=4+rec.range.start%100,c2=4+rec.range.end%100;
-    const compact=rec.height===2;
-    const first=colName(c1)+r1,last=colName(c2)+r2;
-    for(let row=r1;row<=r2;row++)for(let col=c1;col<=c2;col++){
-      const address=colName(col)+row;
-      if(assignments.has(address))throw new Error("Events overlap in the export at "+address);
-      assignments.set(address,{
-        event,compact,
-        text:(row===r1&&col===c1)?displayLines(event).join("\n"):null
-      });
+
+function colNumber(letters){
+  let number=0;for(const ch of letters)number=number*26+ch.charCodeAt(0)-64;return number;
+}
+function location(ref){
+  const a=ref.match(/^([A-Z]+)(\d+)$/);
+  if(!a)throw new Error("Invalid merged cell: "+ref);
+  return {c:colNumber(a[1]),r:Number(a[2])};
+}
+function rect(ref){
+  const [start,end=start]=ref.split(":");
+  const a=location(start),b=location(end);
+  return {c1:a.c,r1:a.r,c2:b.c,r2:b.r};
+}
+function reference(x){return colName(x.c1)+x.r1+":"+colName(x.c2)+x.r2}
+function intersection(a,b){
+  const c1=Math.max(a.c1,b.c1),c2=Math.min(a.c2,b.c2),
+    r1=Math.max(a.r1,b.r1),r2=Math.min(a.r2,b.r2);
+  return c1<=c2&&r1<=r2?{c1,r1,c2,r2}:null;
+}
+function subtractRectangle(original,cut){
+  const i=intersection(original,cut);
+  if(!i)return [original];
+  const remaining=[];
+  // Horizontal sections above/below the new event, and vertical sections
+  // to its left/right. Mirrors the hand-built "Test Event" workbook exactly.
+  if(original.r1<i.r1)remaining.push({c1:original.c1,c2:original.c2,r1:original.r1,r2:i.r1-1});
+  if(i.r2<original.r2)remaining.push({c1:original.c1,c2:original.c2,r1:i.r2+1,r2:original.r2});
+  if(original.c1<i.c1)remaining.push({c1:original.c1,c2:i.c1-1,r1:i.r1,r2:i.r2});
+  if(i.c2<original.c2)remaining.push({c1:i.c2+1,c2:original.c2,r1:i.r1,r2:i.r2});
+  return remaining;
+}
+function isMergedRectangle(x){return x.c1!==x.c2||x.r1!==x.r2}
+function readCells(xml){
+  const found=new Map();
+  const re=/<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*?\/>|<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*>[\s\S]*?<\/c>/g;
+  for(const m of xml.matchAll(re)){
+    const ref=m[1]||m[2],content=m[0],style=Number((content.match(/\bs="(\d+)"/)||[])[1]||0);
+    const hasData=/<(?:v|f|is)\b/.test(content);
+    found.set(ref,{style,content,hasData});
+  }
+  return found;
+}
+function insertMissingCells(xml,missing){
+  if(!missing.size)return xml;
+  const rows=new Map();
+  for(const [ref,cell] of missing){
+    const spot=location(ref);
+    if(!rows.has(spot.r))rows.set(spot.r,[]);
+    rows.get(spot.r).push({column:spot.c,text:cell});
+  }
+  const processed=new Set();
+  xml=xml.replace(/(<row\b[^>]*\br="(\d+)"[^>]*>)([\s\S]*?)(<\/row>)/g,(whole,opening,rowText,body,closing)=>{
+    const row=Number(rowText),additions=rows.get(row);
+    if(!additions)return whole;
+    processed.add(row);
+    additions.sort((a,b)=>a.column-b.column);
+    let updated=body;
+    for(const addition of additions){
+      const existing=[...updated.matchAll(/<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*\/?>/g)];
+      const next=existing.find(e=>location(e[1]).c>addition.column);
+      const at=next?next.index:updated.length;
+      updated=updated.slice(0,at)+addition.text+updated.slice(at);
     }
-    newMerges.push(first+":"+last);
-    assigned++;
-  }
-  if(!assignments.size)return {xml,count:assigned};
-  let replacements=0;
-  // Every grid coordinate in the original master is already a <c> element.
-  // Rewrite these elements only. Leave every non-event cell and sheet XML
-  // attribute untouched, including row heights and existing merge definitions.
-  xml=xml.replace(/<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*?\/>|<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*>[\s\S]*?<\/c>/g,(original,selfClosingRef,normalRef)=>{
-    const ref=selfClosingRef||normalRef;
-    const change=assignments.get(ref);
-    if(!change)return original;
-    replacements++;
-    const originalStyle=Number((original.match(/\bs="(\d+)"/)||[])[1]||0);
-    const s=String(styleIds.resolve(originalStyle,change.event,change.compact));
-    if(change.text===null)return '<c r="'+ref+'" s="'+s+'"/>';
-    return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEscape(change.text)+'</t></is></c>';
+    return opening+updated+closing;
   });
-  if(replacements!==assignments.size){
-    throw new Error("Master is missing "+(assignments.size-replacements)+" expected bay cells; no file was exported.");
+  if(processed.size!==rows.size)throw new Error("The master is missing an expected bay row");
+  return xml;
+}
+function plotSheet(xml,events,layout,styleIds,period,displayLines){
+  const records=Object.values(layout.records).flat().filter(rec=>rec.row>=0);
+  if(!records.length)return {xml,count:0,skipped:[]};
+  const originalCells=readCells(xml);
+  const mergeBlock=xml.match(/<mergeCells\b[^>]*>[\s\S]*?<\/mergeCells>/);
+  if(!mergeBlock)throw new Error("The Excel master is missing its merged-cell layout");
+  const originalMerges=[...mergeBlock[0].matchAll(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*\/>/g)].map(x=>({ref:x[1],area:rect(x[1])}));
+  const occupied=new Set(),placements=[],skipped=[];
+  const eventCells=new Map();
+  for(const rec of records){
+    const event=rec.event;
+    const floorBase={3:4,2:20,1:36}[rec.range.floor];
+    if(!floorBase)continue;
+    const r1=floorBase+(period(event)==="PM"?5:0)+rec.row;
+    const box={c1:4+rec.range.start%100,c2:4+rec.range.end%100,r1,r2:r1+rec.height-1};
+    if(box.c1<5||box.c2>38)throw new Error("Event bays are outside the floor plan");
+    const conflicts=originalMerges.filter(m=>intersection(m.area,box))
+      .filter(m=>[...originalCells].some(([cell,p])=>p.hasData&&intersection(m.area,{...(()=>{const a=location(cell);return {c1:a.c,c2:a.c,r1:a.r,r2:a.r}})()}) ));
+    // Don't silently replace the text in an already populated section. Those
+    // blocks were manually placed in the uploaded weekly master.
+    let hasContent=conflicts.length>0;
+    if(!hasContent){
+      for(let y=box.r1;y<=box.r2&&!hasContent;y++)for(let x=box.c1;x<=box.c2;x++){
+        if(originalCells.get(colName(x)+y)?.hasData){hasContent=true;break}
+      }
+    }
+    if(hasContent){
+      skipped.push(event.name+" ("+reference(box)+") — prefilled master section");
+      continue;
+    }
+    for(let y=box.r1;y<=box.r2;y++)for(let x=box.c1;x<=box.c2;x++){
+      const address=colName(x)+y;
+      if(occupied.has(address))throw new Error("Two imported events overlap at "+address);
+      occupied.add(address);
+      eventCells.set(address,{event,compact:rec.height===2,
+        text:y===box.r1&&x===box.c1?displayLines(event).join("\n"):null});
+    }
+    placements.push(box);
   }
+  if(!placements.length)return {xml,count:0,skipped};
+  const newMerges=[];
+  const leftoverAreas=[];
+  for(const original of originalMerges){
+    let parts=[original.area];
+    for(const placed of placements)parts=parts.flatMap(part=>subtractRectangle(part,placed));
+    const changed=parts.length!==1||!parts.length||reference(parts[0])!==reference(original.area);
+    if(changed)leftoverAreas.push(...parts);
+    for(const p of parts)if(isMergedRectangle(p))newMerges.push(reference(p));
+  }
+  for(const placed of placements)if(isMergedRectangle(placed))newMerges.push(reference(placed));
+  // The untouched merged regions are retained; modified blanks are re-merged
+  // around each inserted event. Never leave overlapping mergeCell entries.
+  const scan=new Set();
+  for(const m of newMerges){
+    if(scan.has(m))throw new Error("Duplicate Excel merge "+m);
+    scan.add(m);
+  }
+  // Find the nearest existing template style, preferably on the same edge of
+  // the old merged region. This handles absent <c> nodes in premerged blocks.
+  function baseStyle(address){
+    const original=originalCells.get(address);
+    if(original)return original.style;
+    const loc=location(address);
+    const containing=originalMerges.find(m=>intersection(m.area,{c1:loc.c,c2:loc.c,r1:loc.r,r2:loc.r}));
+    if(!containing)return 0;
+    const edgeCandidates=[];
+    for(const [ref,cell] of originalCells){
+      const spot=location(ref);
+      if(spot.c<containing.area.c1||spot.c>containing.area.c2||
+        spot.r<containing.area.r1||spot.r>containing.area.r2)continue;
+      const edgeSame=(loc.c===containing.area.c1&&spot.c===loc.c)||
+        (loc.c===containing.area.c2&&spot.c===loc.c)||
+        (loc.r===containing.area.r1&&spot.r===loc.r)||
+        (loc.r===containing.area.r2&&spot.r===loc.r);
+      const distance=Math.abs(loc.c-spot.c)+Math.abs(loc.r-spot.r);
+      edgeCandidates.push({distance:distance+(edgeSame?0:100),style:cell.style});
+    }
+    edgeCandidates.sort((a,b)=>a.distance-b.distance);
+    return edgeCandidates[0]?.style||originalCells.get(colName(containing.area.c1)+containing.area.r1)?.style||0;
+  }
+  const missing=new Map(),rewritten=new Set();
+  function cellXml(address,change){
+    const style=String(styleIds.resolve(baseStyle(address),change.event,change.compact));
+    if(change.text===null)return '<c r="'+address+'" s="'+style+'"/>';
+    return '<c r="'+address+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEscape(change.text)+'</t></is></c>';
+  }
+  const cellRe=/<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*?\/>|<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*>[\s\S]*?<\/c>/g;
+  xml=xml.replace(cellRe,(whole,short,long)=>{
+    const ref=short||long,change=eventCells.get(ref);
+    if(!change)return whole;
+    rewritten.add(ref);
+    return cellXml(ref,change);
+  });
+  for(const [ref,change] of eventCells)if(!rewritten.has(ref))missing.set(ref,cellXml(ref,change));
+  // Rebuild a blank anchor when the original merged section's anchor was
+  // covered by an event and the adjacent remainder needs its own merge anchor.
+  for(const area of leftoverAreas){
+    const anchor=colName(area.c1)+area.r1;
+    if(!originalCells.has(anchor)&&!missing.has(anchor)&&!eventCells.has(anchor))
+      missing.set(anchor,'<c r="'+anchor+'" s="'+baseStyle(anchor)+'"/>');
+  }
+  xml=insertMissingCells(xml,missing);
   xml=replaceSection(xml,"mergeCells",section=>{
-    const existing=new Set([...section.matchAll(/<mergeCell\b[^>]*ref="([^"]+)"/g)].map(x=>x[1]));
-    for(const ref of newMerges)if(existing.has(ref))throw new Error("Master already has an event merge at "+ref);
-    const count=Number((section.match(/<mergeCells\b[^>]*count="(\d+)"/)||[])[1]||0);
-    return section.replace(/<mergeCells\b([^>]*)>/,(_,attrs)=>'<mergeCells'+attrs.replace(/\bcount="\d+"/,'count="'+(count+newMerges.length)+'"')+'>')
+    const count=newMerges.length;
+    return section.replace(/<mergeCells\b([^>]*)>/,(_,attrs)=>
+      '<mergeCells'+attrs.replace(/\bcount="\d+"/,'count="'+count+'"')+'>'
+    ).replace(/<mergeCell\b[^>]*\/>/g,"")
       .replace("</mergeCells>",newMerges.map(ref=>'<mergeCell ref="'+ref+'"/>').join("")+"</mergeCells>");
   });
-  return {xml,count:assigned};
+  return {xml,count:placements.length,skipped};
 }
+
 function formatDownloadDate(date){
   const [year,month,day]=date.split("-");
   return month+"."+day+"."+year.slice(-2);
@@ -208,13 +337,14 @@ export async function exportExactFloorPlan({state,weekEvents,layoutDay,period,di
   const {xml:updatedStyles,styleIds,finalize}=recolorStyles(await styleFile.async("string"));
   // Do not touch any other workbook part besides styles.xml and event bay cells.
   const modified=new Map();
-  let count=0;
+  let count=0;const skipped=[];
   for(let day=0;day<7;day++){
     const path="xl/worksheets/sheet"+(day+1)+".xml";
     const original=zip.file(path);
     if(!original)throw new Error("The master is missing the "+DAYS[day]+" worksheet");
     const events=weekEvents.filter(e=>e.date===addDays(state.week,day));
-    const {xml,count:dayCount}=plotSheet(await original.async("string"),events,layoutDay(events),styleIds,period,displayLines);
+    const {xml,count:dayCount,skipped:daySkipped}=plotSheet(await original.async("string"),events,layoutDay(events),styleIds,period,displayLines);
+    skipped.push(...daySkipped.map(item=>DAYS[day]+": "+item));
     modified.set(path,xml);
     count+=dayCount;
   }
@@ -223,5 +353,5 @@ export async function exportExactFloorPlan({state,weekEvents,layoutDay,period,di
   const result=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
   const filename=formatDownloadDate(state.week)+" - "+formatDownloadDate(addDays(state.week,6))+" Floorplan.xlsx";
   await downloadBinary(result,filename);
-  return {filename,events:count};
+  return {filename,events:count,skipped};
 }
