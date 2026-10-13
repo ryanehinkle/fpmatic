@@ -67,54 +67,90 @@ function recolorStyles(xml){
   if(!xfsMatch)throw new Error("Invalid Excel master cell style table");
   const originals=[...xfsMatch[0].matchAll(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g)].map(x=>x[0]);
   const created=[],cached=new Map();
+  const bordersMatch=xml.match(/<borders\b[^>]*>[\s\S]*?<\/borders>/);
+  if(!bordersMatch)throw new Error("Invalid Excel master border table");
+  const originalBorders=[...bordersMatch[0].matchAll(/<border\b[^>]*\/>|<border\b[^>]*>[\s\S]*?<\/border>/g)].map(m=>m[0]);
+  const addedBorders=[],borderCache=new Map();
 
   function setAttribute(tag,key,value){
     const attr=new RegExp("\\b"+key+'="[^"]*"');
     return attr.test(tag)?tag.replace(attr,key+'="'+value+'"'):tag.replace(/\/?>$/,match=>' '+key+'="'+value+'"'+match);
   }
-  function cloneBaseXf(baseIndex,fillId,fontId){
-    // Start with the EXACT source cell's XF, so its borderId (including thick
-    // left/right outlines and AM/PM top/bottom rules) is never discarded.
+  function addBorder(sides){
+    if(!sides)return null;
+    const names=["left","right","top","bottom"];
+    const key=names.map(name=>sides[name]||"").join("|");
+    if(borderCache.has(key))return borderCache.get(key);
+    const xmlBorder='<border>'+names.map(name=>{
+      const style=sides[name];
+      return style?'<'+name+' style="'+style+'"><color rgb="FF000000"/></'+name+'>':'<'+name+'/>';
+    }).join("")+'<diagonal/></border>';
+    const id=originalBorders.length+addedBorders.length;
+    addedBorders.push(xmlBorder);
+    borderCache.set(key,id);
+    return id;
+  }
+  function centeredAlignment(original){
+    const alignment=original.match(/<alignment\b[^>]*\/>/);
+    if(alignment){
+      // Preserve rotation, indentation, etc. of pre-existing MOD labels.
+      let next=alignment[0];
+      next=setAttribute(next,"horizontal","center");
+      next=setAttribute(next,"vertical","center");
+      next=setAttribute(next,"wrapText",1);
+      return original.replace(alignment[0],next);
+    }
+    const alignmentTag='<alignment horizontal="center" vertical="center" wrapText="1"/>';
+    const opening=original.match(/^<xf\b[^>]*\/>/);
+    if(opening)return original.replace(/\/>$/,'>'+alignmentTag+'</xf>');
+    return original.replace("</xf>",alignmentTag+"</xf>");
+  }
+  function cloneBaseXf(baseIndex,fillId,fontId,borderId,center){
     let original=originals[baseIndex];
     if(!original)throw new Error("Unknown style "+baseIndex+" in master");
-    const tag=original.match(/^<xf\b[^>]*\/?>/);
-    if(!tag)throw new Error("Invalid master style "+baseIndex);
-    let next=tag[0];
-    next=setAttribute(next,"fillId",fillId);
-    next=setAttribute(next,"fontId",fontId);
-    next=setAttribute(next,"applyFill",1);
-    next=setAttribute(next,"applyFont",1);
-    next=setAttribute(next,"applyAlignment",1);
-    original=original.replace(tag[0],next);
-    const alignment='<alignment horizontal="center" vertical="center" wrapText="1"/>';
-    if(next.endsWith("/>")){
-      return original.replace(/\/>$/,'>'+alignment+'</xf>');
-    }
-    if(/<alignment\b[^>]*\/>/.test(original)){
-      return original.replace(/<alignment\b[^>]*\/>/,alignment);
-    }
-    return original.replace("</xf>",alignment+"</xf>");
+    const opening=original.match(/^<xf\b[^>]*\/?>/);
+    if(!opening)throw new Error("Invalid master style "+baseIndex);
+    let next=opening[0];
+    if(fillId!==null){next=setAttribute(next,"fillId",fillId);next=setAttribute(next,"applyFill",1)}
+    if(fontId!==null){next=setAttribute(next,"fontId",fontId);next=setAttribute(next,"applyFont",1)}
+    if(borderId!==null){next=setAttribute(next,"borderId",borderId);next=setAttribute(next,"applyBorder",1)}
+    if(center)next=setAttribute(next,"applyAlignment",1);
+    original=original.replace(opening[0],next);
+    return center?centeredAlignment(original):original;
   }
-
+  function createStyle(baseIndex,fillId,fontId,sides,center){
+    const borderId=addBorder(sides);
+    const key=[baseIndex,fillId,fontId,borderId,center?1:0].join(":");
+    if(!cached.has(key)){
+      cached.set(key,originals.length+created.length);
+      created.push(cloneBaseXf(baseIndex,fillId,fontId,borderId,center));
+    }
+    return cached.get(key);
+  }
   const styleIds={
-    resolve(baseIndex,event,compact){
+    resolve(baseIndex,event,compact,sides){
       const category=COLORS[event.category]?event.category:"Flex";
       const tentative=event.status==="Tentative";
       const color=COLORS[category][tentative?1:0];
-      const white=false; // All event text stays black, including tentative bookings.
-      const fontId=fontIds[(compact?"compact":"normal")+(white?"White":"Black")];
-      const fillId=colorToFill.get(color);
-      const key=[baseIndex,fillId,fontId].join(":");
-      if(!cached.has(key)){
-        cached.set(key,originals.length+created.length);
-        created.push(cloneBaseXf(baseIndex,fillId,fontId));
-      }
-      return cached.get(key);
+      const fontId=fontIds[(compact?"compact":"normal")+"Black"];
+      return createStyle(baseIndex,colorToFill.get(color),fontId,sides,true);
+    },
+    blank(baseIndex,sides){
+      return createStyle(baseIndex,null,null,sides,true);
+    },
+    center(baseIndex){
+      return createStyle(baseIndex,null,null,null,true);
     }
   };
 
   function finalize(stylesXml){
     if(!created.length)return stylesXml;
+    stylesXml=replaceSection(stylesXml,"borders",section=>{
+      if(!addedBorders.length)return section;
+      return section.replace(/<borders\b([^>]*)>/,(_,attrs)=>
+        '<borders'+attrs.replace(/\bcount="\d+"/,'count="'+(originalBorders.length+addedBorders.length)+'"')+'>'
+      ).replace("</borders>",addedBorders.join("")+"</borders>");
+    });
     return replaceSection(stylesXml,"cellXfs",section=>{
       const count=originals.length+created.length;
       return section.replace(/<cellXfs\b([^>]*)>/,(_,attrs)=>
