@@ -206,6 +206,8 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
   const records=Object.values(layout.records).flat().filter(rec=>rec.row>=0);
   if(!records.length)return {xml,count:0,skipped:[]};
   const originalCells=readCells(xml);
+  const gridStyles=[...originalCells].map(([ref,cell])=>({ref,cell,...location(ref)})).filter(x=>x.c>=5&&x.c<=38&&x.r>=4&&x.r<=45);
+  const prefilled=gridStyles.filter(x=>x.cell.hasData);
   const mergeBlock=xml.match(/<mergeCells\b[^>]*>[\s\S]*?<\/mergeCells>/);
   if(!mergeBlock)throw new Error("The Excel master is missing its merged-cell layout");
   const originalMerges=[...mergeBlock[0].matchAll(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*\/>/g)].map(x=>({ref:x[1],area:rect(x[1])}));
@@ -219,7 +221,7 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
     const box={c1:4+rec.range.start%100,c2:4+rec.range.end%100,r1,r2:r1+rec.height-1};
     if(box.c1<5||box.c2>38)throw new Error("Event bays are outside the floor plan");
     const conflicts=originalMerges.filter(m=>intersection(m.area,box))
-      .filter(m=>[...originalCells].some(([cell,p])=>p.hasData&&intersection(m.area,{...(()=>{const a=location(cell);return {c1:a.c,c2:a.c,r1:a.r,r2:a.r}})()}) ));
+      .filter(m=>prefilled.some(p=>p.c>=m.area.c1&&p.c<=m.area.c2&&p.r>=m.area.r1&&p.r<=m.area.r2));
     // Don't silently replace the text in an already populated section. Those
     // blocks were manually placed in the uploaded weekly master.
     let hasContent=conflicts.length>0;
@@ -268,8 +270,8 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
     const containing=originalMerges.find(m=>intersection(m.area,{c1:loc.c,c2:loc.c,r1:loc.r,r2:loc.r}));
     if(!containing)return 0;
     const edgeCandidates=[];
-    for(const [ref,cell] of originalCells){
-      const spot=location(ref);
+    for(const {c,r,cell} of gridStyles){
+      const spot={c,r};
       if(spot.c<containing.area.c1||spot.c>containing.area.c2||
         spot.r<containing.area.r1||spot.r>containing.area.r2)continue;
       const edgeSame=(loc.c===containing.area.c1&&spot.c===loc.c)||
