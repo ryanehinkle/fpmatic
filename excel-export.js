@@ -411,7 +411,7 @@ function renameWeeklyTabs(xml,weekStart,addDays){
     if(day<0)return tag;
     const date=addDays(weekStart,day);
     const parts=date.split("-");
-    const label=name+" "+Number(parts[1])+"."+parts[2];
+    const label=DAYS[day]+" "+Number(parts[1])+"."+parts[2];
     return tag.replace(/\bname="[^"]+"/,'name="'+xmlEscape(label)+'"');
   });
 }
