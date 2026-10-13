@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Verify exact master export
         run: node tests/floorplan-regression.mjs
+      - name: Verify pre-merged weekly masters
+        run: node tests/premerged-master.test.cjs
       - name: Verify CSV report imports
         run: node tests/csv-import.test.cjs
       - name: Configure Pages
