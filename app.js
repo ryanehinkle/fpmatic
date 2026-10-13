@@ -1,4 +1,4 @@
-import {exportExactFloorPlan} from "./excel-export.js?v=20261013b";
+import {exportExactFloorPlan} from "./excel-export.js?v=20261013c";
 import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261013b";
 let pdfjsLib=null;
 
