@@ -1,5 +1,5 @@
-import {exportExactFloorPlan} from "./excel-export.js?v=20261010d";
-import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261010e";
+import {exportExactFloorPlan} from "./excel-export.js?v=20261013b";
+import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261013b";
 let pdfjsLib=null;
 
 const $=id=>document.getElementById(id);
