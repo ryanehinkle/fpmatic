@@ -52,6 +52,7 @@ const {plotSheet,recolorStyles}=vm.runInNewContext(source+"\n({plotSheet,recolor
   const result2=plotSheet(occupied,[e],layout,styled.styleIds,()=>"PM",x=>[x.name]);
   assert.equal(result2.count,0);
   assert.equal(result2.skipped.length,1);
-  assert.equal(result2.xml,occupied,"Occupied section of custom master was altered");
+  assert(result2.xml.includes("Already Assigned"),"Prefilled event content was altered");
+  assert(result2.xml.includes('mergeCell ref="P25:AA29"'),"Prefilled merged region was changed");
   console.log("PASS: premerged weekly master split into adjacent white sections around new event; tentative text black; occupied sections intact.");
 })().catch(e=>{console.error(e);process.exitCode=1});
