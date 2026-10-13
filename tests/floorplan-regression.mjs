@@ -60,8 +60,9 @@ const [oldSheet,newSheet,oldStyles,newStyles]=await Promise.all([
   read(originalZip,"xl/styles.xml"),read(outputZip,"xl/styles.xml")
 ]);
 function cell(xml,ref){
- const regex=new RegExp('<c\\b(?=[^>]*\\br="'+ref+'")[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)');
- const match=xml.match(regex);
+ const self=new RegExp('<c\\b(?=[^>]*\\br="'+ref+'")[^>]*\\/>');
+ const expanded=new RegExp('<c\\b(?=[^>]*\\br="'+ref+'")[^>]*>[\\s\\S]*?<\\/c>');
+ const match=xml.match(self)||xml.match(expanded);
  assert(match,"Missing master cell "+ref);
  return match[0];
 }
