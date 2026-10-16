@@ -79,15 +79,33 @@ function anchoredBayRanges(xml){
 }
 export async function applyEventHyperlinks(zip,modified,dayPaths,shared,events,links,week,addDays,linkStyle=null){
   let added=0;
-  for(let day=0;day<7;day++){
-    const path=dayPaths[day],xml=modified.get(path);
-    if(!path||!xml)continue;
+  const targets=[];
+  for(let day=0;day<7;day++)if(dayPaths[day])
+    targets.push({day,path:dayPaths[day],auxiliary:false});
+  // Some uploaded weekly floorplans have extra "AM Monday..." / "Tuesday
+  // ... AM" tabs. They must get hyperlinks too, without any other edits.
+  const bookFile=zip.file("xl/workbook.xml");
+  const bookXml=bookFile?await bookFile.async("string"):"";
+  const names=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  for(const m of bookXml.matchAll(/<sheet\b[^>]*\/>/g)){
+    const name=(m[0].match(/\bname="([^"]+)"/)||[])[1]||"";
+    const day=names.findIndex(n=>new RegExp("^(?:AM\\s+"+n+"\\b|"+n+"\\b.*\\bAM\\b)","i").test(name));
+    if(day<0)continue;
+    const id=(m[0].match(/\bsheetId="(\d+)"/)||[])[1];
+    if(!id)continue;
+    const path="xl/worksheets/sheet"+id+".xml";
+    if(targets.some(x=>x.path===path)||!zip.file(path))continue;
+    targets.push({day,path,auxiliary:true});
+  }
+  for(const {day,path,auxiliary} of targets){
+    const xml=modified.get(path)||(await zip.file(path).async("string"));
+    if(!xml)continue;
     const date=addDays(week,day),cells=parseFloorplanCell(xml,shared),items=[],baysByAnchor=anchoredBayRanges(xml);
     for(const [ref,cell] of cells){
       if(!cell.text||!/^[A-Z]{1,3}\d+$/.test(ref))continue;
       const numeric=(ref.match(/\d+/)||[])[0],row=Number(numeric);
       // Event cells only, never a staffing or reference worksheet.
-      if(![4,9,20,25,36,41].some(top=>row>=top&&row<=top+4))continue;
+      if(!auxiliary&&![4,9,20,25,36,41].some(top=>row>=top&&row<=top+4))continue;
       const url=linkForWorksheetText(cell.text,date,events,links,baysByAnchor.get(ref)||"");
       if(url)items.push({ref,url});
     }
