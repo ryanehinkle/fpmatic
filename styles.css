@@ -161,3 +161,22 @@ body.is-landing .intro{margin:clamp(40px,12vh,130px) auto 0}
   white-space:pre-line;
   text-align:center;
 }
+
+
+/* Salesforce links: only interaction changes, never event appearance. */
+.salesforce-dialog{width:min(93vw,540px);max-width:540px}
+.links-modal-inner{padding:2px 24px 21px}
+.links-instructions{color:#b4b9c4;font-size:.82rem;margin:0 0 16px}
+.links-paste{
+  width:100%;min-height:136px;border-radius:9px;border:1px dashed #52739a;
+  background:#12171e;color:#dde8f2;padding:15px;outline:none;
+  font-size:.84rem;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;
+}
+.links-paste:empty:before{content:attr(data-placeholder);color:#8595a8;pointer-events:none}
+.links-paste:focus{border-color:#80b6e7;box-shadow:0 0 0 2px #36516e66}
+.links-status{min-height:30px;color:#98b4ce;font-size:.78rem;line-height:1.55;margin:11px 0 17px}
+.salesforce-dialog .modal-heading{margin-bottom:20px}
+.salesforce-dialog .modal-footer{justify-content:space-between;padding:0}
+.preview-region[data-salesforce-url]{cursor:pointer}
+.preview-region[data-salesforce-url]:focus-visible,.event-item[role=link]:focus-visible{outline:2px solid #83b2dd;outline-offset:-2px}
+.preview-region[data-salesforce-url] span,.event-item[role=link] strong,.event-plot{color:inherit;text-decoration:none}
