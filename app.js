@@ -1,6 +1,6 @@
-import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=20261016d";
-import {readWorkbookPreview} from "./floorplan-preview.js?v=20261016d";
-import {workbookDayPaths} from "./floorplan-sync.js?v=20261016d";
+import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=20261016e";
+import {readWorkbookPreview} from "./floorplan-preview.js?v=20261016e";
+import {workbookDayPaths} from "./floorplan-sync.js?v=20261016e";
 import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261013b";
 let pdfjsLib=null;
 
