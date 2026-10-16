@@ -2,6 +2,7 @@ import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=2026
 import {readWorkbookPreview} from "./floorplan-preview.js?v=20261016e";
 import {workbookDayPaths} from "./floorplan-sync.js?v=20261016e";
 import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261013b";
+import {extractSalesforceLinks,canonicalOpportunity,matchingSalesforceLink,linkForWorksheetText,safeSalesforceUrl} from "./salesforce-links.js?v=20261016g";
 let pdfjsLib=null;
 
 const $=id=>document.getElementById(id);
@@ -14,7 +15,7 @@ const COLOR={
   "Youth":{Definite:"#F4CCCC",Tentative:"#E06666"}
 };
 const STORAGE="fpmatic-v1";
-const state={events:[],week:"",day:0,selection:"",master:null,masterName:"",files:[],showBayNumbers:true,layout:null,preview:null,changesByDay:[],previewWarning:""};
+const state={events:[],week:"",day:0,selection:"",master:null,masterName:"",files:[],showBayNumbers:true,layout:null,preview:null,changesByDay:[],previewWarning:"",salesforceLinks:[]};
 let noticeTimer;
 function notify(msg){$("toast").textContent=msg;$("toast").classList.add("visible");clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$("toast").classList.remove("visible"),3400)}
 function pad(n){return String(n).padStart(2,"0")}
@@ -163,8 +164,23 @@ async function parsePdf(file){
   }
   return out;
 }
-function persist(){try{localStorage.setItem(STORAGE,JSON.stringify({events:state.events,week:state.week,day:state.day,files:state.files}))}catch(e){/* local storage may be disabled */}}
-function restore(){try{const d=JSON.parse(localStorage.getItem(STORAGE)||"null");if(d&&Array.isArray(d.events)){state.events=d.events.filter(e=>!/^Tom[\u0027\u2019]s Lessons$/i.test(String(e.name||"").trim()));state.week=d.week;state.day=d.day||0;state.files=d.files||[]}}catch(e){}}
+function persist(){try{localStorage.setItem(STORAGE,JSON.stringify({events:state.events,week:state.week,day:state.day,files:state.files,salesforceLinks:state.salesforceLinks}))}catch(e){/* local storage may be disabled */}}
+function restore(){try{const d=JSON.parse(localStorage.getItem(STORAGE)||"null");if(d&&Array.isArray(d.events)){state.events=d.events.filter(e=>!/^Tom[\u0027\u2019]s Lessons$/i.test(String(e.name||"").trim()));state.week=d.week;state.day=d.day||0;state.files=d.files||[];state.salesforceLinks=Array.isArray(d.salesforceLinks)?d.salesforceLinks.filter(x=>safeSalesforceUrl(x.url)):[];attachSalesforceLinks()}}catch(e){}}
+function attachSalesforceLinks(){
+  let matched=0;
+  for(const e of state.events){
+    const item=matchingSalesforceLink(e,state.salesforceLinks);
+    if(item){e.salesforceUrl=item.url;matched++}
+    else delete e.salesforceUrl;
+  }
+  return matched;
+}
+function openSalesforceOrEdit(e,buttonEvent){
+  const url=safeSalesforceUrl(e.salesforceUrl);
+  if(url&&!buttonEvent.shiftKey&&!buttonEvent.altKey){
+    window.open(url,"_blank","noopener,noreferrer");
+  }else openEditor(e.id);
+}
 function overlaps(a,b){return a.start<=b.end&&b.start<=a.end}
 function timeCollision(a,b){
   const aa=clockMin(a.golfStart||a.start),ab=clockMin(a.golfEnd||a.end),ba=clockMin(b.golfStart||b.start),bb=clockMin(b.golfEnd||b.end);
@@ -273,12 +289,14 @@ function previewFloorBoard(floor){
       const line=visibleText.split(/\r?\n/)[0].trim();
       const normalize=t=>String(t||"").toLowerCase().replace(/[^a-z0-9]/g,"");
       const event=dayEvents().find(e=>normalize(e.name)===normalize(line));
+      const link=event?.salesforceUrl||linkForWorksheetText(g.text,addDays(state.week,state.day),dayEvents(),state.salesforceLinks);
+      const safeLink=safeSalesforceUrl(link);
       const borders={...g.borders};
       if(full.r1<a.r1)borders.top="0";
       if(full.r2>a.r2)borders.bottom="0";
       const css='grid-column:'+(a.c1-4)+' / '+(a.c2-3)+';grid-row:'+(a.r1-top+1)+' / span '+(a.r2-a.r1+1)+';color:'+(g.fontColor||"#000")+';'+
         ['left','right','top','bottom'].map(k=>'border-'+k+':'+borders[k]).join(';');
-      return '<div class="preview-region'+(visibleText?" has-text":"")+(g.isStaff?" staffing-label":"")+(event?" preview-event":"")+'"'+(event?' data-event="'+escapeHtml(event.id)+'"':'')+' style="'+css+'" title="'+escapeHtml(g.text||"")+'">'+
+      return '<div class="preview-region'+(visibleText?" has-text":"")+(g.isStaff?" staffing-label":"")+(event?" preview-event":"")+'"'+(event?' data-event="'+escapeHtml(event.id)+'"':'')+(safeLink?' data-salesforce-url="'+escapeHtml(safeLink)+'" role="link" tabindex="0"':'')+' style="'+css+'" title="'+escapeHtml(safeLink?"Open Salesforce · Shift+click to edit":g.text||"")+'">'+
         (visibleText?'<span>'+escapeHtml(visibleText)+'</span>':"")+'</div>';
     }).join("");
     return '<div class="period-wrap"><div class="period-label '+part.toLowerCase()+'">'+part+'</div><div class="event-grid preview-grid">'+bases+fills+html+'</div></div>';
@@ -353,7 +371,7 @@ function render(){
   $("eventListCount").textContent=shown.length;
   $("eventList").innerHTML=shown.length?shown.map(e=>{
     const warn=selectedIssues.has(e.id);const bays=baySegments(e.bays);
-    return '<div class="event-item'+(state.selection===e.id?" selected":"")+'" data-event="'+escapeHtml(e.id)+'"><i class="swatch" style="background:'+color(e)+'"></i><div class="event-item-main"><strong>'+escapeHtml(e.name)+'</strong><span>'+escapeHtml(fmtRange(e.start,e.end))+' · '+escapeHtml(e.package)+' · '+e.guests+' guests</span></div><div class="event-item-side '+(warn?"item-warning":"")+'">'+(warn?"⚠ Review":bays.length?escapeHtml(e.bays):"No bays")+'<br>'+period(e)+'</div></div>';
+    return '<div class="event-item'+(state.selection===e.id?" selected":"")+'" data-event="'+escapeHtml(e.id)+'"'+(e.salesforceUrl?' tabindex="0" role="link" title="Open Salesforce · Shift+click to edit"':'')+'><i class="swatch" style="background:'+color(e)+'"></i><div class="event-item-main"><strong>'+escapeHtml(e.name)+'</strong><span>'+escapeHtml(fmtRange(e.start,e.end))+' · '+escapeHtml(e.package)+' · '+e.guests+' guests</span></div><div class="event-item-side '+(warn?"item-warning":"")+'">'+(warn?"⚠ Review":bays.length?escapeHtml(e.bays):"No bays")+'<br>'+period(e)+'</div></div>';
   }).join(""):'<div class="empty">No events match this view.</div>';
   const dailyIssues=issues.filter(x=>x.event.date===addDays(start,state.day)).concat(layout.overflow);
   $("issueCount").textContent=dailyIssues.length;
@@ -379,7 +397,7 @@ function saveEditor(){
   if(!!data.golfStart!==!!data.golfEnd)return notify("Enter both golf times, or leave both blank");
   if(editId){Object.assign(state.events.find(e=>e.id===editId),data)}
   else{data.id="manual-"+Date.now()+"-"+Math.random().toString(36).slice(2,5);state.events.push(data)}
-  state.week=weekOf(data.date);state.day=(localDate(data.date).getDay()+6)%7;closeEditor();notify("Event saved");refreshWorkbookPreview();
+  state.week=weekOf(data.date);state.day=(localDate(data.date).getDay()+6)%7;attachSalesforceLinks();closeEditor();notify("Event saved");refreshWorkbookPreview();
 }
 
 const csvFiles={staffing:null,menus:null};
@@ -415,7 +433,7 @@ async function runCsvReports(){
   try{
     const incoming=buildEvents(csvFiles.staffing.rows,csvFiles.menus.rows,csvFiles.staffing.file.name,csvFiles.menus.file.name);
     if(!incoming.events.length)throw new Error("No events found in Event Staffing");
-    state.events=incoming.events.filter(e=>!/^Tom[\u0027\u2019]s Lessons$/i.test(e.name.trim()));
+    state.events=incoming.events.filter(e=>!/^Tom[\u0027\u2019]s Lessons$/i.test(e.name.trim()));attachSalesforceLinks();
     state.files=[csvFiles.staffing.file.name,csvFiles.menus.file.name];
     const dates=incoming.events.filter(e=>e.date).map(e=>e.date).sort();
     state.week=dates.length?weekOf(dates[0]):weekOf(isoDate(new Date()));
@@ -475,6 +493,37 @@ async function exportWorkbook(){
     button.textContent=originalText;
   }
 }
+$("addLinks").addEventListener("click",()=>{
+  $("linksPaste").textContent="";
+  $("linksStatus").textContent=state.salesforceLinks.length+" saved Salesforce link"+(state.salesforceLinks.length===1?"":"s")+". Paste a Salesforce report below.";
+  $("salesforceLinksDialog").showModal();
+  $("linksPaste").focus();
+});
+$("closeLinks").addEventListener("click",()=>$("salesforceLinksDialog").close());
+$("doneLinks").addEventListener("click",()=>$("salesforceLinksDialog").close());
+$("clearLinks").addEventListener("click",()=>{
+  state.salesforceLinks=[];
+  attachSalesforceLinks();
+  $("linksPaste").textContent="";
+  $("linksStatus").textContent="All Salesforce links cleared.";
+  render();
+});
+$("linksPaste").addEventListener("paste",e=>{
+  e.preventDefault();
+  const rich=e.clipboardData?.getData("text/html")||"";
+  const links=extractSalesforceLinks(rich);
+  if(!links.length){
+    $("linksStatus").textContent="No hyperlinks found. Copy directly from the Salesforce report, then paste here (not plain text).";
+    return;
+  }
+  const all=new Map(state.salesforceLinks.map(item=>[canonicalOpportunity(item.name),item]));
+  for(const item of links)all.set(canonicalOpportunity(item.name),item);
+  state.salesforceLinks=[...all.values()];
+  const matched=attachSalesforceLinks();
+  $("linksPaste").textContent=links.length+" linked opportunities pasted";
+  $("linksStatus").textContent=links.length+" links detected · "+matched+" events matched · "+state.salesforceLinks.length+" stored. Shift+click an event to edit.";
+  render();
+});
 $("staffInput").addEventListener("change",async e=>{try{await registerCsvFile(e.target.files[0],"staffing")}catch(error){$("reportFeedback").textContent=error.message;notify(error.message)}e.target.value=""});
 $("menuInput").addEventListener("change",async e=>{try{await registerCsvFile(e.target.files[0],"menus")}catch(error){$("reportFeedback").textContent=error.message;notify(error.message)}e.target.value=""});
 $("csvInput").addEventListener("change",async e=>{await acceptCsvFiles(e.target.files,true);e.target.value=""});
@@ -487,7 +536,7 @@ const drop=$("reportsDropzone");
 for(const ev of ["dragenter","dragover"])drop.addEventListener(ev,e=>{e.preventDefault();for(const box of drop.querySelectorAll(".report-file"))box.classList.add("dragging")});
 for(const ev of ["dragleave","drop"])drop.addEventListener(ev,e=>{e.preventDefault();for(const box of drop.querySelectorAll(".report-file"))box.classList.remove("dragging")});
 drop.addEventListener("drop",e=>acceptCsvFiles(e.dataTransfer.files,false));
-$("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.master=null;state.masterName="";state.preview=null;state.changesByDay=[];$("currentFileName").textContent="Choose XLSX";$("currentBox").classList.remove("ready");$("masterPicker").textContent="Excel master";$("masterPicker").title="Load an existing Excel floor plan";csvFiles.staffing=null;csvFiles.menus=null;$("staffFileName").textContent="Choose CSV";$("menuFileName").textContent="Choose CSV";$("staffBox").classList.remove("ready");$("menuBox").classList.remove("ready");$("buildFromReports").disabled=true;$("reportFeedback").textContent="";try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
+$("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.salesforceLinks=[];state.master=null;state.masterName="";state.preview=null;state.changesByDay=[];$("currentFileName").textContent="Choose XLSX";$("currentBox").classList.remove("ready");$("masterPicker").textContent="Excel master";$("masterPicker").title="Load an existing Excel floor plan";csvFiles.staffing=null;csvFiles.menus=null;$("staffFileName").textContent="Choose CSV";$("menuFileName").textContent="Choose CSV";$("staffBox").classList.remove("ready");$("menuBox").classList.remove("ready");$("buildFromReports").disabled=true;$("reportFeedback").textContent="";try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
 async function loadCurrentFloorplan(file){
   if(!file)return;
   if(!/\.xlsx$/i.test(file.name))throw new Error("Choose an XLSX floor plan.");
@@ -526,8 +575,29 @@ $("export").addEventListener("click",exportWorkbook);
 $("prevWeek").addEventListener("click",()=>{state.week=addDays(state.week,-7);state.day=0;render();refreshWorkbookPreview()});
 $("nextWeek").addEventListener("click",()=>{state.week=addDays(state.week,7);state.day=0;render();refreshWorkbookPreview()});
 $("dayTabs").addEventListener("click",e=>{const b=e.target.closest("[data-day]");if(b){state.day=+b.dataset.day;state.selection="";render()}});
-$("floorBoards").addEventListener("click",e=>{const b=e.target.closest("[data-event]");if(b)openEditor(b.dataset.event)});
-$("eventList").addEventListener("click",e=>{const b=e.target.closest("[data-event]");if(b)openEditor(b.dataset.event)});
+$("floorBoards").addEventListener("click",e=>{
+  const linked=e.target.closest("[data-salesforce-url]");
+  if(linked&&!e.shiftKey&&!e.altKey){
+    const url=safeSalesforceUrl(linked.dataset.salesforceUrl);
+    if(url)window.open(url,"_blank","noopener,noreferrer");
+    return;
+  }
+  const b=e.target.closest("[data-event]");
+  if(b){const item=state.events.find(x=>x.id===b.dataset.event);if(item)openSalesforceOrEdit(item,e)}
+});
+$("eventList").addEventListener("click",e=>{
+  const b=e.target.closest("[data-event]");if(!b)return;
+  const item=state.events.find(x=>x.id===b.dataset.event);
+  if(item)openSalesforceOrEdit(item,e);
+});
+for(const name of ["floorBoards","eventList"])$(name).addEventListener("keydown",e=>{
+  if(e.key!=="Enter"&&e.key!==" ")return;
+  const b=e.target.closest("[role=link]");
+  if(!b)return;
+  e.preventDefault();
+  const url=safeSalesforceUrl(b.dataset.salesforceUrl||state.events.find(x=>x.id===b.dataset.event)?.salesforceUrl);
+  if(url)window.open(url,"_blank","noopener,noreferrer");
+});
 $("issues").addEventListener("click",e=>{const b=e.target.closest("[data-event]");if(b)openEditor(b.dataset.event)});
 $("eventSearch").addEventListener("input",render);
 $("eventFilter").addEventListener("change",render);
