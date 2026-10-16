@@ -41,6 +41,13 @@ function eventInfo(area,text){
   const floor=area.r1>=36?1:area.r1>=20?2:3;
   return {...p,area,floor,bays:floor*100+area.c1-4+"-"+(floor*100+area.c2-4),startRow:area.r1};
 }
+function findRange(value){
+  const m=String(value||"").match(/\b(\d{1,4})\s*[-–]\s*(\d{1,4})\b/);
+  return m?m[1].replace(/^0+(?=\d)/,"")+"-"+m[2].replace(/^0+(?=\d)/,""):"";
+}
+function roomLabel(value){
+  return (String(value||"").match(/\b(?:Full Sig|Sig N\+S|Sig S|Sig N|LL|UL|Terrace)\b/i)||[])[0]||"";
+}
 function timeLabel(s){const [h,m]=String(s||"").split(":").map(Number);if(!Number.isFinite(h))return "";return (h%12||12)+(m?String(m).padStart(2,"0"):"")}
 function desiredText(e,displayLines,old){
   const lines=displayLines(e);
@@ -148,6 +155,19 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
         changes.push({name:e.name,type:"bays",before:oldBays,after:updatedBays});
       if(old.package&&e.package&&normalized(old.package.replace(/^FX$/i,"Flex").replace(/^Ult Bites$/i,"Ultimate"))!==normalized(e.package))
         changes.push({name:e.name,type:"package",before:old.package,after:e.package});
+      const oldTime=findRange(old.description.join(" | "));
+      const newLabel=displayLines(e).slice(1);
+      const newTime=findRange(newLabel[0]||"");
+      if(oldTime&&newTime&&oldTime!==newTime)
+        changes.push({name:e.name,type:"time",before:oldTime,after:newTime});
+      const previousRoom=roomLabel(old.description.join(" "));
+      const updatedRoom=e.space||"";
+      if(previousRoom&&updatedRoom&&normalized(previousRoom)!==normalized(updatedRoom))
+        changes.push({name:e.name,type:"space",before:previousRoom,after:updatedRoom});
+      const oldGolf=(old.description.join(" ").match(/\bGolf\s+(\d{1,4}\s*[-–]\s*\d{1,4})\b/i)||[])[1]||"";
+      const newGolf=newLabel.find(line=>/^Golf /i.test(line))||"";
+      if(oldGolf&&newGolf&&findRange(oldGolf)!==findRange(newGolf))
+        changes.push({name:e.name,type:"golf",before:findRange(oldGolf),after:findRange(newGolf)});
     }else changes.push({name:e.name,type:"added",before:"Not on floorplan",after:e.bays});
     for(const area of ranges)planned.push({area,event:e,old,inPlace:Boolean(old&&ref(old.area)===ref(area)),text:desiredText(e,displayLines,old)});
   }
