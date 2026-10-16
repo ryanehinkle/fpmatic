@@ -35,9 +35,11 @@ jobs:
         run: node tests/live-preview.test.cjs
       - name: Check browser module syntax
         run: |
-          for file in app.js excel-export.js floorplan-sync.js floorplan-preview.js csv-import.js; do
+          for file in app.js excel-export.js floorplan-sync.js floorplan-preview.js csv-import.js salesforce-links.js sheet-hyperlinks.js; do
             node --input-type=module --check < "$file"
           done
+      - name: Verify Salesforce opportunity links
+        run: node tests/salesforce-links.test.cjs
       - name: Verify CSV report imports
         run: node tests/csv-import.test.cjs
       - name: Configure Pages
