@@ -53,7 +53,7 @@
     <nav class="day-tabs" id="dayTabs" aria-label="Day of week"></nav>
     <div class="work-grid">
       <section class="board-panel panel">
-        <div class="panel-heading"><div><h3 id="dayHeading">Monday</h3><div class="mini" id="daySubheading"></div></div><div class="board-tools"><button class="button subtle small" id="toggleNames">Hide bays</button><span id="dayTotal" class="count-pill"></span></div></div>
+        <div class="panel-heading"><div><h3 id="dayHeading">Monday</h3><div class="mini" id="daySubheading"></div></div><div class="board-tools"><button class="button subtle small" id="addLinks" type="button">Add links</button><button class="button subtle small" id="toggleNames">Hide bays</button><span id="dayTotal" class="count-pill"></span></div></div>
         <div class="board-scroll"><div id="floorBoards" class="floor-boards"></div></div>
         <div class="board-foot">Yellow: couch bays · White: high-tops · Click event to edit</div>
       </section>
@@ -99,6 +99,15 @@
   <div class="editor-note" id="editorNote"></div>
   <div class="modal-footer"><button id="deleteEvent" type="button" class="button dangerous">Delete</button><div class="footer-right"><button id="cancelEditor" type="button" class="button subtle">Cancel</button><button type="submit" class="button primary">Save event</button></div></div>
 </form>
+</dialog>
+<dialog id="salesforceLinksDialog" class="editor-dialog salesforce-dialog">
+  <div class="modal-heading"><div><h2>Add links</h2></div><button class="icon-button" type="button" id="closeLinks" aria-label="Close">×</button></div>
+  <div class="links-modal-inner">
+    <p class="links-instructions">Copy the Salesforce event report, then paste it below.</p>
+    <div id="linksPaste" class="links-paste" contenteditable="true" role="textbox" aria-label="Paste Salesforce report with links" aria-multiline="true" data-placeholder="Click here and press Ctrl + V"></div>
+    <p class="links-status" id="linksStatus" role="status">Opportunity links will be matched automatically.</p>
+    <div class="modal-footer"><button type="button" id="clearLinks" class="button subtle">Clear links</button><button type="button" id="doneLinks" class="button primary">Done</button></div>
+  </div>
 </dialog>
 <input id="pdfInput" type="file" accept=".pdf,application/pdf" multiple hidden>
 <input id="staffInput" type="file" accept=".csv,text/csv" hidden>
