@@ -92,5 +92,20 @@ const JSZip=require("../jszip.min.js");
  assert(final.includes('ref="E4" r:id="rId'));
  assert((await original.file("xl/worksheets/_rels/sheet1.xml.rels").async("string")).includes(id));
  assert(final.includes(originalAnchor),"Event formatting changed after links were added");
+ // A second AM worksheet can repeat opportunities and must also get links,
+ // without moving cells or changing the existing text/section formatting.
+ const workbook=await original.file("xl/workbook.xml").async("string");
+ original.file("xl/workbook.xml",workbook.replace("</sheets>",
+   '<sheet name="AM Tuesday 10.13" sheetId="88" r:id="rId88"/></sheets>'));
+ const extra='<worksheet><sheetData><row r="5"><c r="K5" s="17" t="inlineStr"><is>'+
+   '<t>BMO Bank&#10;4-7&#10;30ppl&#10;Fajita</t></is></c></row></sheetData></worksheet>';
+ original.file("xl/worksheets/sheet88.xml",extra);
+ const touched=new Map([["xl/worksheets/sheet1.xml",await original.file("xl/worksheets/sheet1.xml").async("string")]]);
+ const auxCount=await api.applyEventHyperlinks(original,touched,{0:"xl/worksheets/sheet1.xml"},[],
+   [],parsed,"2026-10-12",(week,day)=>"2026-10-"+String(12+day).padStart(2,"0"));
+ assert(auxCount>=1,"Additional AM worksheet event did not receive a link");
+ const updated=touched.get("xl/worksheets/sheet88.xml");
+ assert(updated.includes('ref="K5"'),"Repeated BMO opportunity missing from AM worksheet");
+ assert(updated.includes('s="17"'),"Extra worksheet event formatting changed unexpectedly");
  console.log("PASS: pasted Salesforce HTML, full Opportunity Name matching, safe URLs, invisible Excel hyperlinks, and unaffected formatting");
 })().catch(e=>{console.error(e);process.exitCode=1});
