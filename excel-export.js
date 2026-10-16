@@ -145,9 +145,9 @@ function recolorStyles(xml){
       return createStyle(baseIndex,null,null,null,true);
     },
     staff(baseIndex){
-      // Only vertical alignment changes. The source XLSX font/color, fill,
-      // borders and custom styling are retained exactly.
-      return createStyle(baseIndex,null,null,null,true,"bottom");
+      // Center staff and events both horizontally and vertically while
+      // retaining the master cell's font, color, borders and rich text.
+      return createStyle(baseIndex,null,null,null,true,"center");
     },
     clear(baseIndex){
       return createStyle(baseIndex,colorToFill.get("FFFFFF"),null,null,true);
