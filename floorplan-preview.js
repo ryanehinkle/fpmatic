@@ -35,15 +35,20 @@ function sheetStyles(xml){
     }
     return obj;
   });
+  const fonts=tags("fonts","font").map(s=>{
+    const fontColor=(s.match(/<color\b[^>]*\brgb="([0-9A-Fa-f]{8})"/)||[])[1];
+    return {color:fontColor?"#"+fontColor.slice(-6):"#000000"};
+  });
   const formats=tags("cellXfs","xf").map(s=>({
     fillId:+((s.match(/\bfillId="(\d+)"/)||[])[1]||0),
-    borderId:+((s.match(/\bborderId="(\d+)"/)||[])[1]||0)
+    borderId:+((s.match(/\bborderId="(\d+)"/)||[])[1]||0),
+    fontId:+((s.match(/\bfontId="(\d+)"/)||[])[1]||0)
   }));
-  return {fills,borders,formats};
+  return {fills,borders,fonts,formats};
 }
 function styleFor(styles,index){
   const fmt=styles.formats[index]||styles.formats[0]||{fillId:0,borderId:0};
-  return {fill:styles.fills[fmt.fillId]||"transparent",border:styles.borders[fmt.borderId]||{}};
+  return {fill:styles.fills[fmt.fillId]||"transparent",border:styles.borders[fmt.borderId]||{},fontColor:styles.fonts[fmt.fontId]?.color||"#000000"};
 }
 function effectiveBorder(cells,styles,area,side){
   const rank={none:0,hair:1,dotted:1,dashed:1,thin:2,medium:3,thick:4,double:4};
@@ -70,7 +75,8 @@ function gridRegion(area,text,cells,styles){
   const base=styleFor(styles,cell?.style||0);
   const edges={};
   for(const side of ["top","bottom","left","right"])edges[side]=cssBorder(effectiveBorder(cells,styles,area,side));
-  return {area,text:text||"",fill:base.fill,borders:edges};
+  const isEvent=/\b\d+\s*ppl\b/i.test(text||"");
+  return {area,text:text||"",fill:base.fill,fontColor:base.fontColor,isStaff:Boolean(text&&!isEvent),borders:edges};
 }
 export async function readWorkbookPreview(blob){
   if(typeof JSZip!=="function")throw new Error("Excel ZIP library was not loaded");
@@ -102,7 +108,18 @@ export async function readWorkbookPreview(blob){
       const area={c1:p.c,c2:p.c,r1:p.r,r2:p.r};
       regions.push(gridRegion(area,cell.text,cells,stylesheet));
     }
-    days.push({regions,path});
+    // Use each actual Excel cell's fill rather than spreading the anchor
+    // color across the entire merged region (which creates false color blocks).
+    const fills=[];
+    for(const [addr,cell] of cells){
+      const p=toCell(addr);
+      if(!p||p.c<5||p.c>38)continue;
+      if(!floors.some(f=>[f.am,f.pm].some(top=>p.r>=top&&p.r<=top+4)))continue;
+      const fill=styleFor(stylesheet,cell.style).fill;
+      if(fill==="transparent"||!fill)continue;
+      fills.push({c:p.c,r:p.r,color:fill});
+    }
+    days.push({regions,fills,path});
   }
   return {days};
 }
