@@ -6,7 +6,7 @@ const vm=require("node:vm");
 const JSZip=require("../jszip.min.js");
 const path=require("node:path");
 const source=fs.readFileSync(path.join(__dirname,"..","excel-export.js"),"utf8")
-  .replace(/^import[^\n]*\n/,"").replace("export async function exportExactFloorPlan","async function exportExactFloorPlan");
+  .replace(/^import[^\n]*\n/,"").replace(/^export /gm,"");
 const {plotSheet,recolorStyles}=vm.runInNewContext(source+"\n({plotSheet,recolorStyles})");
 (async()=>{
   const zip=await JSZip.loadAsync(fs.readFileSync(path.join(__dirname,"..","master.xlsx")));
