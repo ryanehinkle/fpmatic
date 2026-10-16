@@ -255,14 +255,23 @@ function previewFloorBoard(floor){
     const fills=(snap.fills||[]).filter(x=>x.r>=top&&x.r<=top+4).map(x=>
       '<div class="preview-cell-fill" style="grid-column:'+(x.c-4)+' / span 1;grid-row:'+(x.r-top+1)+';background:'+x.color+'"></div>'
     ).join("");
-    const html=snap.regions.filter(g=>g.area.r1>=top&&g.area.r2<=top+4).map(g=>{
-      const a=g.area,line=(g.text||"").split(/\r?\n/)[0].trim();
+    const html=snap.regions.filter(g=>g.area.r1<=top+4&&g.area.r2>=top).map(g=>{
+      const full=g.area;
+      // A 12–8 assignment may span all ten AM/PM rows. The XLSX merge
+      // remains untouched; this clips only what is displayed in each half.
+      const a={...full,r1:Math.max(full.r1,top),r2:Math.min(full.r2,top+4)};
+      const showText=!(g.isStaff&&full.r2>top+4);
+      const visibleText=showText?(g.text||""):"";
+      const line=visibleText.split(/\r?\n/)[0].trim();
       const normalize=t=>String(t||"").toLowerCase().replace(/[^a-z0-9]/g,"");
       const event=dayEvents().find(e=>normalize(e.name)===normalize(line));
+      const borders={...g.borders};
+      if(full.r1<a.r1)borders.top="0";
+      if(full.r2>a.r2)borders.bottom="0";
       const css='grid-column:'+(a.c1-4)+' / '+(a.c2-3)+';grid-row:'+(a.r1-top+1)+' / span '+(a.r2-a.r1+1)+';color:'+(g.fontColor||"#000")+';'+
-        ['left','right','top','bottom'].map(k=>'border-'+k+':'+g.borders[k]).join(';');
-      return '<div class="preview-region'+(g.text?" has-text":"")+(g.isStaff?" staffing-label":"")+(event?" preview-event":"")+'"'+(event?' data-event="'+escapeHtml(event.id)+'"':'')+' style="'+css+'" title="'+escapeHtml(g.text||"")+'">'+
-        (g.text?'<span>'+escapeHtml(g.text)+'</span>':"")+'</div>';
+        ['left','right','top','bottom'].map(k=>'border-'+k+':'+borders[k]).join(';');
+      return '<div class="preview-region'+(visibleText?" has-text":"")+(g.isStaff?" staffing-label":"")+(event?" preview-event":"")+'"'+(event?' data-event="'+escapeHtml(event.id)+'"':'')+' style="'+css+'" title="'+escapeHtml(g.text||"")+'">'+
+        (visibleText?'<span>'+escapeHtml(visibleText)+'</span>':"")+'</div>';
     }).join("");
     return '<div class="period-wrap"><div class="period-label '+part.toLowerCase()+'">'+part+'</div><div class="event-grid preview-grid">'+fills+html+'</div></div>';
   }
