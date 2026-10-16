@@ -146,14 +146,14 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
       const oldBays=old.bays,updatedBays=bays.map(x=>x.start+"-"+x.end).join(", ");
       if(normalized(oldBays)!==normalized(updatedBays))
         changes.push({name:e.name,type:"bays",before:oldBays,after:updatedBays});
-      if(old.package&&e.package&&normalized(old.package)!==normalized(e.package)&&!(old.package==="FX"&&e.package==="Flex"))
+      if(old.package&&e.package&&normalized(old.package.replace(/^FX$/i,"Flex").replace(/^Ult Bites$/i,"Ultimate"))!==normalized(e.package))
         changes.push({name:e.name,type:"package",before:old.package,after:e.package});
     }else changes.push({name:e.name,type:"added",before:"Not on floorplan",after:e.bays});
-    for(const area of ranges)planned.push({area,event:e,old,text:desiredText(e,displayLines,old)});
+    for(const area of ranges)planned.push({area,event:e,old,inPlace:Boolean(old&&ref(old.area)===ref(area)),text:desiredText(e,displayLines,old)});
   }
   if(!planned.length)return {xml,changes,warnings,placed:0};
   const updates=new Map(),deleted=new Set(),newMerges=mergeNodes.slice();
-  const removing=new Set([...planned].map(p=>p.old).filter(Boolean));
+  const removing=new Set([...planned].filter(p=>!p.inPlace).map(p=>p.old).filter(Boolean));
   function removeMerge(a){const i=newMerges.findIndex(v=>ref(v)===ref(a));if(i>=0)newMerges.splice(i,1)}
   function addMerge(a){if(a.c1!==a.c2||a.r1!==a.r2)newMerges.push(a)}
   function clearArea(area,style){
@@ -183,8 +183,8 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
   }
   // Merge original staff/blank sections around each new booking. Reposition a
   // displaced staff label within the largest leftover fragment, never discard.
-  for(const {area,event,old,text} of planned){
-    for(const existing of newMerges.slice()){
+  for(const {area,event,old,text,inPlace} of planned){
+    if(!inPlace)for(const existing of newMerges.slice()){
       if(!hit(existing,area))continue;
       const ownedStaff=staff.find(s=>ref(s.area)===ref(existing));
       removeMerge(existing);
@@ -198,7 +198,7 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
         updates.set(anchor,eventCell(anchor,ownedStaff.cell.text,styles.center(ownedStaff.cell.style)));
       }
     }
-    addMerge(area);
+    if(!inPlace)addMerge(area);
     for(let r=area.r1;r<=area.r2;r++)for(let c=area.c1;c<=area.c2;c++){
       const address=col(c)+r,sourceStyle=cells.get(address)?.style||old?.cell.style||0;
       const style=styles.event(sourceStyle,event,r===area.r1&&c===area.c1?area.r2-area.r1+1===2:false);
