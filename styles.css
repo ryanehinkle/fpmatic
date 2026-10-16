@@ -80,3 +80,31 @@ body.is-landing .site-header{display:none}
 body.is-landing main{padding-top:0}
 body.is-landing .intro{margin:clamp(40px,12vh,130px) auto 0}
 @media(max-width:650px){body.is-landing .intro{margin:clamp(20px,7vh,60px) auto 0}}
+
+
+/* Three-file workflow and workbook-accurate event previews */
+.optional-report{border-color:#343b46;background:#141418}
+.optional-report .report-file-name{font-weight:800}
+.optional-label{font-weight:500;color:#9396a1;font-size:.72rem}
+.optional-report:not(.ready) .report-file-status{color:#a4a7af}
+.preview-grid{position:relative}
+.preview-region{
+  min-width:0;min-height:0;z-index:1;overflow:hidden;display:flex;
+  align-items:center;justify-content:center;text-align:center;
+  white-space:pre-line;word-break:normal;overflow-wrap:anywhere;
+  font-family:Calibri,"Carlito",Arial,sans-serif;
+  font-weight:700;font-size:11px;line-height:1.13;
+  padding:2px;color:#000;
+}
+.preview-region.has-text{z-index:3}
+.preview-region.preview-event{cursor:pointer}
+.preview-region.preview-event:hover{outline:2px solid #569bd3;outline-offset:-2px;z-index:6}
+.preview-region>span{max-width:100%;max-height:100%;overflow:hidden;display:block;white-space:pre-line}
+.preview-grid .preview-region:not(.has-text){pointer-events:none}
+.change-panel .change-list{max-height:350px;overflow:auto;padding:3px 13px 11px}
+.change-entry{padding:12px 0;border-bottom:1px solid #2d3038}
+.change-entry:last-child{border-bottom:0}
+.change-entry strong{display:block;font-size:.76rem;color:#e6e7ed;margin-bottom:7px;overflow-wrap:anywhere}
+.change-diff{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:.73rem;color:#a0a3b0}
+.change-diff span:last-child{color:#a8d5aa;font-weight:800}
+.change-arrow{color:#6a9ed0}
