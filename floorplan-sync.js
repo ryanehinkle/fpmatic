@@ -138,6 +138,16 @@ function setCell(xml,updates){
 function eventCell(ref,text,style){return '<c r="'+ref+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+encode(text)+'</t></is></c>'}
 function blankCell(ref,style){return '<c r="'+ref+'" s="'+style+'"/>'}
 
+function centerRemainingText(cells,updates,styles){
+  // Do not leave unmerged singleton staff labels or imported notes with a
+  // different alignment from the rest of the floor plan.
+  for(const [addr,cell] of cells){
+    if(updates.has(addr)||!cell.text.trim())continue;
+    const p=loc(addr);
+    if(!p||p.c<5||p.c>38||!EVENT_ROWS.some(([a,b])=>p.r>=a&&p.r<=b))continue;
+    updates.set(addr,relocateOriginalCell(cell,addr,styles.center(cell.style)));
+  }
+}
 function relocateOriginalCell(cell,newAddress,newStyle){
   // Keep the original cell body (shared string, formulas, inline rich-text
   // runs, and character-level formatting) intact. Only the cell position and
@@ -272,6 +282,7 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
     for(const old of original)if(!alignment.has(old.address)){
       alignment.set(old.address,relocateOriginalCell(old.cell,old.address,styles.center(old.cell.style)));
     }
+    centerRemainingText(cells,alignment,styles);
     const resultXml=setCell(xml,alignment);
     // No new event does not mean no cleanup: an uploaded week's empty
     // sections should still be merged without touching its staffing.
@@ -374,6 +385,7 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
     if(updates.has(old.address))continue;
     updates.set(old.address,relocateOriginalCell(old.cell,old.address,styles.center(old.cell.style)));
   }
+  centerRemainingText(cells,updates,styles);
   xml=setCell(xml,updates);
   // Finish any remaining blank, unmerged bay areas. The original section
   // dividers remain boundaries, and staff/event text is never swallowed.
