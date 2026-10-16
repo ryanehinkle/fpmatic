@@ -130,7 +130,27 @@ function recolorStyles(xml){
     }
     return cached.get(key);
   }
+  function sectionBorderEdge(styleId,side){
+    const xf=originals[styleId]||originals[0]||"";
+    const bid=Number((xf.match(/\bborderId="(\d+)"/)||[])[1]||0);
+    const border=originalBorders[bid]||"";
+    const tag=(border.match(new RegExp("<"+side+"\\b[^>]*(?:\\/>|>[\\s\\S]*?<\\/"+side+">)"))||[])[0]||"";
+    const weight=(tag.match(/\bstyle="([^"]+)"/)||[])[1]||"";
+    if(!weight)return false;
+    if(/^(medium|thick|double|mediumDashed)$/.test(weight))return true;
+    if(weight!=="thin")return false;
+    const hex=(tag.match(/<color\b[^>]*\brgb="([0-9A-Fa-f]{6,8})"/)||[])[1];
+    if(!hex)return true; // Excel's normal grid lines are not actual styled borders.
+    const rgb=hex.slice(-6);
+    const channels=[0,2,4].map(i=>parseInt(rgb.slice(i,i+2),16));
+    return Math.max(...channels)<125;
+  }
   const styleIds={
+    hardDivider(leftId,rightId,direction){
+      return direction==="vertical"?
+        sectionBorderEdge(leftId,"right")||sectionBorderEdge(rightId,"left"):
+        sectionBorderEdge(leftId,"bottom")||sectionBorderEdge(rightId,"top");
+    },
     resolve(baseIndex,event,compact,sides){
       const category=COLORS[event.category]?event.category:"Flex";
       const tentative=event.status==="Tentative";
