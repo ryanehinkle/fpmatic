@@ -1,4 +1,5 @@
 import {reconcileDay,workbookDayPaths,parseFloorplanShared} from "./floorplan-sync.js?v=20261016e";
+import {applyEventHyperlinks} from "./sheet-hyperlinks.js?v=20261016g";
 /*
  * Format-preserving Excel export for FPmatic.
  * We never read the original workbook through XLSX parsers or rebuild worksheets.
@@ -521,12 +522,15 @@ export async function buildExactFloorPlan({state,weekEvents,layoutDay,period,dis
       skipped.push(...result.skipped.map(w=>DAYS[day]+": "+w));
     }
   }
+  // Add links to worksheet event anchors without changing a single cell
+  // style, font, border, merge, color or visible text.
+  const hyperlinked=await applyEventHyperlinks(zip,modified,dayPaths,shared,weekEvents,state.salesforceLinks||[],state.week,addDays);
   zip.file("xl/workbook.xml",renameWeeklyTabs(workbookXml,state.week,addDays));
   zip.file("xl/styles.xml",finalize(updatedStyles));
   for(const [path,xml] of modified)zip.file(path,xml);
   const result=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
   const filename=formatDownloadDate(state.week)+" - "+formatDownloadDate(addDays(state.week,6))+" Floorplan.xlsx";
-  return {blob:result,filename,events:count,skipped,changesByDay};
+  return {blob:result,filename,events:count,skipped,changesByDay,hyperlinked};
 }
 export async function exportExactFloorPlan(options){
   const result=await buildExactFloorPlan(options);
