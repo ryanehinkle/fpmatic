@@ -108,3 +108,15 @@ body.is-landing .intro{margin:clamp(40px,12vh,130px) auto 0}
 .change-diff{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:.73rem;color:#a0a3b0}
 .change-diff span:last-child{color:#a8d5aa;font-weight:800}
 .change-arrow{color:#6a9ed0}
+
+/* Original workbook staff labels: lower in the reserved section, never force black. */
+.preview-grid .preview-cell-fill{z-index:1;pointer-events:none;min-width:0;min-height:0}
+.preview-grid .preview-region{z-index:2;background:transparent;color:inherit}
+.preview-grid .preview-region.has-text{z-index:4}
+.preview-grid .preview-region.staffing-label{
+  align-items:flex-end;
+  padding-bottom:6px;
+}
+.preview-grid .preview-region.staffing-label >span{
+  overflow:visible;max-height:none;
+}
