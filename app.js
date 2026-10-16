@@ -1,4 +1,6 @@
-import {exportExactFloorPlan} from "./excel-export.js?v=20261013c";
+import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=20261016b";
+import {readWorkbookPreview} from "./floorplan-preview.js?v=20261016a";
+import {workbookDayPaths} from "./floorplan-sync.js?v=20261016a";
 import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261013b";
 let pdfjsLib=null;
 
@@ -12,7 +14,7 @@ const COLOR={
   "Youth":{Definite:"#F4CCCC",Tentative:"#E06666"}
 };
 const STORAGE="fpmatic-v1";
-const state={events:[],week:"",day:0,selection:"",master:null,masterName:"",files:[],showBayNumbers:true,layout:null};
+const state={events:[],week:"",day:0,selection:"",master:null,masterName:"",files:[],showBayNumbers:true,layout:null,preview:null,changesByDay:[],previewWarning:""};
 let noticeTimer;
 function notify(msg){$("toast").textContent=msg;$("toast").classList.add("visible");clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$("toast").classList.remove("visible"),3400)}
 function pad(n){return String(n).padStart(2,"0")}
@@ -241,6 +243,52 @@ function renderPeriod(floor,part,recordList){
   }).join("");
   return '<div class="period-wrap"><div class="period-label '+part.toLowerCase()+'">'+part+'</div><div class="event-grid">'+plots+'</div></div>';
 }
+function previewFloorBoard(floor){
+  const snap=state.preview?.days?.[state.day];
+  if(!snap)return null;
+  const hdr=Array.from({length:34},(_,i)=>{
+    const n=floor*100+i+1;
+    return '<div class="bay-no '+(couch(floor,n)?"couch":neutral(floor,n)?"neutral":"")+'">'+(state.showBayNumbers?n:"")+'</div>';
+  }).join("");
+  function forPeriod(part){
+    const top={3:4,2:20,1:36}[floor]+(part==="PM"?5:0);
+    const html=snap.regions.filter(g=>g.area.r1>=top&&g.area.r2<=top+4).map(g=>{
+      const a=g.area,line=(g.text||"").split(/\r?\n/)[0].trim();
+      const normalize=t=>String(t||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+      const event=dayEvents().find(e=>normalize(e.name)===normalize(line));
+      const css='grid-column:'+(a.c1-4)+' / '+(a.c2-2)+';grid-row:'+(a.r1-top+1)+' / span '+(a.r2-a.r1+1)+';background:'+(g.fill==="transparent"?"#ffffff":g.fill)+';'+
+        ['left','right','top','bottom'].map(k=>'border-'+k+':'+g.borders[k]).join(';');
+      return '<div class="preview-region'+(g.text?" has-text":"")+(event?" preview-event":"")+'"'+(event?' data-event="'+escapeHtml(event.id)+'"':'')+' style="'+css+'" title="'+escapeHtml(g.text||"")+'">'+
+        (g.text?'<span>'+escapeHtml(g.text)+'</span>':"")+'</div>';
+    }).join("");
+    return '<div class="period-wrap"><div class="period-label '+part.toLowerCase()+'">'+part+'</div><div class="event-grid preview-grid">'+html+'</div></div>';
+  }
+  const label={1:"FIRST FLOOR",2:"SECOND FLOOR",3:"THIRD FLOOR"}[floor];
+  return '<section class="floor-board"><div class="floor-title">'+label+'</div><div class="floor-main"><div class="landmarks">'+renderLandmarks(floor)+'</div><div class="bay-headers">'+hdr+'</div>'+forPeriod("AM")+forPeriod("PM")+'<div class="bay-headers">'+hdr+'</div></div></section>';
+}
+let previewToken=0;
+async function refreshWorkbookPreview(){
+  if(!state.events.length){state.preview=null;state.changesByDay=[];return}
+  const token=++previewToken;
+  state.preview=null;state.previewWarning="";
+  $("daySubheading").textContent="Building Excel preview…";
+  try{
+    const output=await buildExactFloorPlan({state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays});
+    const snapshot=await readWorkbookPreview(output.blob);
+    if(token!==previewToken)return;
+    state.preview=snapshot;
+    state.changesByDay=output.changesByDay||[];
+    state.previewWarning=output.skipped?.length?output.skipped.join("\n"):"";
+    render();
+  }catch(error){
+    if(token!==previewToken)return;
+    console.error("Workbook preview failed",error);
+    state.preview=null;state.changesByDay=[];
+    state.previewWarning="Excel preview unavailable: "+(error.message||error);
+    notify(state.previewWarning);
+    render();
+  }
+}
 function floorBoard(floor,layout){
   const ids=Array.from({length:34},(_,i)=>floor*100+i+1);
   const hdr=ids.map(n=>'<div class="bay-no '+(couch(floor,n)?"couch":neutral(floor,n)?"neutral":"")+'">'+(state.showBayNumbers?n:"")+'</div>').join("");
@@ -269,7 +317,16 @@ function render(){
   $("dayHeading").textContent=DAYS[state.day]+" · "+niceDate(addDays(start,state.day),{month:"long",day:"numeric"});
   $("daySubheading").textContent="102 bays · AM / PM";
   $("dayTotal").textContent=day.length+" event"+(day.length===1?"":"s");
-  $("floorBoards").innerHTML=[3,2,1].map(f=>floorBoard(f,layout)).join("");
+  $("floorBoards").innerHTML=[3,2,1].map(f=>state.preview?previewFloorBoard(f):floorBoard(f,layout)).join("");
+  if(state.preview)$("daySubheading").textContent="Excel preview · 102 bays · AM / PM";
+  else if(state.previewWarning)$("daySubheading").textContent=state.previewWarning;
+  const changed=state.changesByDay[state.day]||[];
+  $("changePanel").hidden=!state.master;
+  $("changeCount").textContent=changed.length;
+  $("changeList").innerHTML=changed.length?changed.map(change=>
+    '<div class="change-entry"><strong>'+escapeHtml(change.name)+'</strong><div class="change-diff">'+
+    '<span>'+escapeHtml(change.before)+'</span><span class="change-arrow">→</span><span>'+escapeHtml(change.after)+'</span></div></div>'
+  ).join(""):'<div class="empty">No event changes for this day.</div>';
   const search=$("eventSearch").value.trim().toLowerCase(),f=$("eventFilter").value;
   const selectedIssues=new Set(issues.map(x=>x.event.id).concat(layout.overflow.map(x=>x.event.id)));
   const shown=day.slice().sort((a,b)=>(clockMin(a.start)||0)-(clockMin(b.start)||0)||a.name.localeCompare(b.name)).filter(e=>(!search||[e.name,e.bays,e.package,e.beo].join(" ").toLowerCase().includes(search))&&(f==="all"||f==="issues"&&selectedIssues.has(e.id)||period(e)===f));
@@ -302,7 +359,7 @@ function saveEditor(){
   if(!!data.golfStart!==!!data.golfEnd)return notify("Enter both golf times, or leave both blank");
   if(editId){Object.assign(state.events.find(e=>e.id===editId),data)}
   else{data.id="manual-"+Date.now()+"-"+Math.random().toString(36).slice(2,5);state.events.push(data)}
-  state.week=weekOf(data.date);state.day=(localDate(data.date).getDay()+6)%7;closeEditor();notify("Event saved");
+  state.week=weekOf(data.date);state.day=(localDate(data.date).getDay()+6)%7;closeEditor();notify("Event saved");refreshWorkbookPreview();
 }
 
 const csvFiles={staffing:null,menus:null};
@@ -345,6 +402,7 @@ async function runCsvReports(){
     state.day=0;state.selection="";
     $("eventSearch").value="";$("eventFilter").value="all";
     render();
+    await refreshWorkbookPreview();
     notify(incoming.events.length+" events · "+incoming.matched+" catering matches"+(incoming.unmatched.length?" · "+incoming.unmatched.length+" unmatched menus":""));
   }catch(error){
     console.error("FPmatic report build failed",error);
@@ -370,7 +428,7 @@ async function importFiles(files){
     const dates=state.events.filter(e=>e.date).map(e=>e.date).sort();
     if(dates.length){const newDates=state.events.filter(e=>e.date&&all.some(f=>f.name===e.source)).map(e=>e.date).sort();state.week=weekOf(newDates[0]||dates[0]);}
     state.day=0;state.selection="";
-    render();notify("Imported "+found+" BEO event"+(found===1?"":"s"));
+    render();await refreshWorkbookPreview();notify("Imported "+found+" BEO event"+(found===1?"":"s"));
     if(found===0)notify("No Manager Catering BEO events found. Please check the PDF.");
   }catch(err){console.error(err);notify("PDF parsing error: "+err.message)}
   finally{$("newUpload").disabled=false;$("pdfInput").value=""}
@@ -410,7 +468,7 @@ const drop=$("reportsDropzone");
 for(const ev of ["dragenter","dragover"])drop.addEventListener(ev,e=>{e.preventDefault();for(const box of drop.querySelectorAll(".report-file"))box.classList.add("dragging")});
 for(const ev of ["dragleave","drop"])drop.addEventListener(ev,e=>{e.preventDefault();for(const box of drop.querySelectorAll(".report-file"))box.classList.remove("dragging")});
 drop.addEventListener("drop",e=>acceptCsvFiles(e.dataTransfer.files,false));
-$("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.master=null;state.masterName="";$("masterPicker").textContent="Excel master";$("masterPicker").title="Load an existing Excel floor plan";csvFiles.staffing=null;csvFiles.menus=null;$("staffFileName").textContent="Choose CSV";$("menuFileName").textContent="Choose CSV";$("staffBox").classList.remove("ready");$("menuBox").classList.remove("ready");$("buildFromReports").disabled=true;$("reportFeedback").textContent="";try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
+$("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.master=null;state.masterName="";state.preview=null;state.changesByDay=[];$("currentFileName").textContent="Choose XLSX";$("currentBox").classList.remove("ready");$("masterPicker").textContent="Excel master";$("masterPicker").title="Load an existing Excel floor plan";csvFiles.staffing=null;csvFiles.menus=null;$("staffFileName").textContent="Choose CSV";$("menuFileName").textContent="Choose CSV";$("staffBox").classList.remove("ready");$("menuBox").classList.remove("ready");$("buildFromReports").disabled=true;$("reportFeedback").textContent="";try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
 $("templateInput").addEventListener("change",async e=>{
   const file=e.target.files[0];if(!file)return;
   try{
@@ -435,8 +493,8 @@ $("templateInput").addEventListener("change",async e=>{
   }finally{e.target.value="";}
 });
 $("export").addEventListener("click",exportWorkbook);
-$("prevWeek").addEventListener("click",()=>{state.week=addDays(state.week,-7);state.day=0;render()});
-$("nextWeek").addEventListener("click",()=>{state.week=addDays(state.week,7);state.day=0;render()});
+$("prevWeek").addEventListener("click",()=>{state.week=addDays(state.week,-7);state.day=0;render();refreshWorkbookPreview()});
+$("nextWeek").addEventListener("click",()=>{state.week=addDays(state.week,7);state.day=0;render();refreshWorkbookPreview()});
 $("dayTabs").addEventListener("click",e=>{const b=e.target.closest("[data-day]");if(b){state.day=+b.dataset.day;state.selection="";render()}});
 $("floorBoards").addEventListener("click",e=>{const b=e.target.closest("[data-event]");if(b)openEditor(b.dataset.event)});
 $("eventList").addEventListener("click",e=>{const b=e.target.closest("[data-event]");if(b)openEditor(b.dataset.event)});
@@ -448,6 +506,6 @@ $("addEvent").addEventListener("click",()=>openEditor(""));
 $("closeEditor").addEventListener("click",closeEditor);
 $("cancelEditor").addEventListener("click",closeEditor);
 $("editorForm").addEventListener("submit",e=>{e.preventDefault();saveEditor()});
-$("deleteEvent").addEventListener("click",()=>{if(editId&&confirm("Delete this event from the floor plan?")){state.events=state.events.filter(x=>x.id!==editId);closeEditor();notify("Event deleted")}});
+$("deleteEvent").addEventListener("click",()=>{if(editId&&confirm("Delete this event from the floor plan?")){state.events=state.events.filter(x=>x.id!==editId);closeEditor();refreshWorkbookPreview();notify("Event deleted")}});
 $("editorDialog").addEventListener("close",()=>{state.selection="";render()});
-restore();render();
+restore();render();if(state.events.length)refreshWorkbookPreview();
