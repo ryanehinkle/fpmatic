@@ -534,7 +534,7 @@ async function processSalesforcePaste(html){
   button.textContent="Matching…";button.disabled=true;
   status.textContent="Scanning…";status.classList.add("link-processing");status.classList.remove("link-finished");
   try{
-    const links=extractSalesforceLinks(html);
+    const links=extractSalesforceLinks(html,state.salesforceLinks[0]?.url||"");
     if(!links.length){
       status.textContent="No Salesforce links found";
       notify("Copy the Salesforce report with its links, then click Add links and paste.");
@@ -570,7 +570,7 @@ $("addLinks").addEventListener("click",async()=>{
       if(!item.types.includes("text/html"))continue;
       const blob=await item.getType("text/html");
       const rich=await blob.text();
-      if(extractSalesforceLinks(rich).length){
+      if(extractSalesforceLinks(rich,state.salesforceLinks[0]?.url||"").length){
         await processSalesforcePaste(rich);
         return;
       }
