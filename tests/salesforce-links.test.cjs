@@ -37,6 +37,46 @@ assert(result.rels.includes(href.replace("&","&amp;")));
 const second=api.addSheetHyperlinks(result.xml,result.rels,[{ref:"E4",url:href}]);
 assert.equal((second.xml.match(/<hyperlink ref="E4"/g)||[]).length,1,"Duplicated hyperlink for same event");
 assert.equal((second.xml.match(/<hyperlink\b/g)||[]).length,1,"Unexpected repeated hyperlink");
+
+// The user's actual Salesforce report has name/contact/date, time, bay and
+// guest columns. Fuzzy names must use all fields, not just the first title.
+const reportRow=(start,end,name,bays,guests,link)=>
+  '<tr><td>'+start+'</td><td>'+end+'</td><td>Online Booking</td>'+
+  '<td><a href="'+link+'">'+name+'</a></td><td>Executed</td>'+
+  '<td>1005</td><td>'+bays+'</td><td>9</td><td>USD 0.00</td><td>'+guests+'</td></tr>';
+const rowHtml='<table>'+
+  reportRow("10:00 AM","12:00 PM","Sipley Elementary - Michael Davis - 10.13.26","226-234",52,
+    "https://topgolf.lightning.force.com/lightning/r/Opportunity/SIPLEY/view")+
+  reportRow("4:00 PM","7:00 PM","BMO Bank - Janna Lewis - 10.13.26","230-234",30,
+    "https://topgolf.lightning.force.com/lightning/r/Opportunity/BMO/view")+
+  reportRow("3:00 PM","5:00 PM","Sipley Student Party - Contact - 10.13.26","309-310",14,
+    "https://topgolf.lightning.force.com/lightning/r/Opportunity/OTHER/view")+
+  '</table>';
+const parsed=api.extractSalesforceLinks(rowHtml);
+assert.equal(parsed.length,3);
+const sipley=parsed.find(x=>/Sipley Elementary/.test(x.name));
+assert.equal(sipley.start,"10:00 AM");
+assert.equal(sipley.end,"12:00 PM");
+assert.equal(sipley.bays,"226-234");
+assert.equal(sipley.guests,52);
+const matchedSchool=api.matchingSalesforceLink({name:"Sipley Elem School",date:"2026-10-13",
+  start:"10:00",end:"12:00",bays:"226-234",guests:52},parsed);
+assert(matchedSchool&&/SIPLEY/.test(matchedSchool.url),"Partial school name with matching time/bays/guest should resolve");
+const linkedSchool=api.linkForWorksheetText("Sipley Elementary\n10-12\n52ppl\nField Trip",
+  "2026-10-13",[],parsed,"226-234");
+assert(linkedSchool&&linkedSchool.includes("/SIPLEY/"),"Existing workbook event was not linked using supporting report details");
+const repeated=api.linkForWorksheetText("BMO Bank\n4-7\n30ppl\nFajita",
+  "2026-10-13",[],parsed,"230-234");
+assert(repeated&&repeated.includes("/BMO/"),"Repeated event label failed to inherit the link");
+const shortRepeated=api.linkForWorksheetText("BMO Bank\n4-7\nFajita",
+  "2026-10-13",[],parsed,"230-234");
+assert(shortRepeated&&shortRepeated.includes("/BMO/"),"Event repeated without guest line should still link");
+assert.equal(api.matchingSalesforceLink({name:"Sipley Elem School",date:"2026-10-14",
+  start:"10:00",end:"12:00",bays:"226-234",guests:52},parsed),null,"Never match across event dates");
+const spreadsheetRepeated=api.addSheetHyperlinks(oldXml,null,[{ref:"E4",url:href},{ref:"F4",url:href}],n=>n+1000);
+assert.equal(spreadsheetRepeated.added,2,"All appearances of an event must receive a hyperlink");
+assert(spreadsheetRepeated.xml.includes('<hyperlink ref="F4"'),"Repeated event appearance had no link");
+assert(spreadsheetRepeated.xml.includes('s="1022"'),"Hyperlinked event did not receive explicit visual-preservation font");
 const originalSheetWithExisting=result.xml.replace("</hyperlinks>",'<hyperlink ref="G9" r:id="rId999"/></hyperlinks>');
 const preserved=api.addSheetHyperlinks(originalSheetWithExisting,result.rels,[{ref:"E4",url:href}]);
 assert(preserved.xml.includes('ref="G9"'),"Unrelated hyperlink was removed");
