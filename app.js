@@ -469,29 +469,40 @@ for(const ev of ["dragenter","dragover"])drop.addEventListener(ev,e=>{e.preventD
 for(const ev of ["dragleave","drop"])drop.addEventListener(ev,e=>{e.preventDefault();for(const box of drop.querySelectorAll(".report-file"))box.classList.remove("dragging")});
 drop.addEventListener("drop",e=>acceptCsvFiles(e.dataTransfer.files,false));
 $("resetAll").addEventListener("click",()=>{if(!confirm("Clear all imported events and edits to start a new week?"))return;state.events=[];state.week="";state.day=0;state.selection="";state.files=[];state.master=null;state.masterName="";state.preview=null;state.changesByDay=[];$("currentFileName").textContent="Choose XLSX";$("currentBox").classList.remove("ready");$("masterPicker").textContent="Excel master";$("masterPicker").title="Load an existing Excel floor plan";csvFiles.staffing=null;csvFiles.menus=null;$("staffFileName").textContent="Choose CSV";$("menuFileName").textContent="Choose CSV";$("staffBox").classList.remove("ready");$("menuBox").classList.remove("ready");$("buildFromReports").disabled=true;$("reportFeedback").textContent="";try{localStorage.removeItem(STORAGE)}catch(e){}render();notify("Ready for a new week");});
-$("templateInput").addEventListener("change",async e=>{
-  const file=e.target.files[0];if(!file)return;
-  try{
-    if(!/\.xlsx$/i.test(file.name))throw new Error("Choose an .xlsx floor plan");
-    const bytes=await file.arrayBuffer();
-    if(typeof JSZip!=="function")throw new Error("Excel reader is unavailable");
-    const zip=await JSZip.loadAsync(bytes,{checkCRC32:true});
-    if(!zip.file("xl/styles.xml"))throw new Error("Invalid Excel formatting");
-    for(let day=1;day<=7;day++){
-      const sheet=zip.file("xl/worksheets/sheet"+day+".xml");
-      if(!sheet)throw new Error("Master needs Monday–Sunday worksheets");
-      const xml=await sheet.async("string");
-      if(!/<mergeCells\b/.test(xml))throw new Error("Missing floor-plan merges on sheet "+day);
-    }
-    state.master=bytes;state.masterName=file.name;
-    $("masterPicker").textContent="✓ Excel master";
-    $("masterPicker").title=file.name+" — loaded for export";
-    render();
-    notify("Excel master loaded: "+file.name);
-  }catch(error){
-    notify("Master not loaded: "+(error.message||String(error)));
-  }finally{e.target.value="";}
-});
+async function loadCurrentFloorplan(file){
+  if(!file)return;
+  if(!/\.xlsx$/i.test(file.name))throw new Error("Choose an XLSX floor plan.");
+  const bytes=await file.arrayBuffer();
+  if(typeof JSZip!=="function")throw new Error("Excel library was not loaded.");
+  const zip=await JSZip.loadAsync(bytes,{checkCRC32:true});
+  if(!zip.file("xl/styles.xml")||!zip.file("xl/workbook.xml"))throw new Error("Invalid Excel workbook.");
+  const workbook=await zip.file("xl/workbook.xml").async("string");
+  const daySheets=workbookDayPaths(workbook);
+  for(let day=0;day<7;day++){
+    const path=daySheets[day];
+    if(!path||!zip.file(path))throw new Error("Missing "+DAYS[day]+" floorplan sheet.");
+    const data=await zip.file(path).async("string");
+    if(!/<mergeCells\b/.test(data))throw new Error("Missing merged sections on "+DAYS[day]+".");
+  }
+  state.master=bytes;state.masterName=file.name;
+  $("currentFileName").textContent=file.name;
+  $("currentBox").classList.add("ready");
+  $("masterPicker").textContent="✓ Excel master";
+  $("masterPicker").title=file.name+" — loaded for reconciliation and export";
+  render();
+  if(state.events.length)await refreshWorkbookPreview();
+  notify("Current floorplan loaded: "+file.name);
+}
+async function acceptCurrentUpload(input){
+  const file=input.files?.[0];
+  if(!file)return;
+  try{await loadCurrentFloorplan(file)}
+  catch(error){console.error("Current floorplan:",error);notify("Floorplan not loaded: "+(error.message||String(error)));$("reportFeedback").textContent=error.message||String(error)}
+  finally{input.value=""}
+}
+$("currentInput").addEventListener("change",e=>acceptCurrentUpload(e.target));
+$("templateInput").addEventListener("change",e=>acceptCurrentUpload(e.target));
+
 $("export").addEventListener("click",exportWorkbook);
 $("prevWeek").addEventListener("click",()=>{state.week=addDays(state.week,-7);state.day=0;render();refreshWorkbookPreview()});
 $("nextWeek").addEventListener("click",()=>{state.week=addDays(state.week,7);state.day=0;render();refreshWorkbookPreview()});
