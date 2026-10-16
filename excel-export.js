@@ -1,4 +1,4 @@
-import {reconcileDay,workbookDayPaths,parseFloorplanShared} from "./floorplan-sync.js?v=20261016c";
+import {reconcileDay,workbookDayPaths,parseFloorplanShared} from "./floorplan-sync.js?v=20261016d";
 /*
  * Format-preserving Excel export for FPmatic.
  * We never read the original workbook through XLSX parsers or rebuild worksheets.
