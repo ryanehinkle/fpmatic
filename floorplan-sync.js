@@ -283,6 +283,17 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
   }
   xml=setCell(xml,updates);
   const unique=[...new Map(newMerges.map(m=>[ref(m),m])).values()];
+  // Excel cannot safely display overlapping merged cells. Fail the preview
+  // and export rather than silently corrupting the uploaded weekly floorplan.
+  for(let i=0;i<unique.length;i++){
+    const a=unique[i];
+    if(a.c1<5||a.c2>38)continue;
+    for(let j=i+1;j<unique.length;j++){
+      const b=unique[j];
+      if(b.c1<5||b.c2>38)continue;
+      if(hit(a,b))throw new Error("Overlapping floorplan sections: "+ref(a)+" and "+ref(b));
+    }
+  }
   xml=xml.replace(/<mergeCells\b([^>]*)>[\s\S]*?<\/mergeCells>/,block=>
     block.replace(/\bcount="\d+"/,'count="'+unique.length+'"')
       .replace(/<mergeCell\b[^>]*\/>/g,"")
