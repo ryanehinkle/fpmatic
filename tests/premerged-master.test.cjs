@@ -94,9 +94,9 @@ const {plotSheet,recolorStyles}=vm.runInNewContext(source+"\n({plotSheet,recolor
   }
   const linkedFontId=Number((linkedStyle.match(/\bfontId="(\d+)"/)||[])[1]||0);
   const fontXml=(finalized.match(/<fonts\b[^>]*>([\s\S]*?)<\/fonts>/)||[])[1]||"";
-  const fonts=[...fontXml.matchAll(/<font\b[^>]*\/>|<font\b[^>]*>[\s\S]*?<\/font>/g)].map(m=>m[0]);
-  assert(fonts[linkedFontId]?.includes('<u val="none"/>'),"Linked font must explicitly disable underlining");
-  assert(/<color\b/.test(fonts[linkedFontId]||""),"Linked font needs an explicit original color to prevent blue text");
+  const linkedFonts=[...fontXml.matchAll(/<font\b[^>]*\/>|<font\b[^>]*>[\s\S]*?<\/font>/g)].map(m=>m[0]);
+  assert(linkedFonts[linkedFontId]?.includes('<u val="none"/>'),"Linked font must explicitly disable underlining");
+  assert(/<color\b/.test(linkedFonts[linkedFontId]||""),"Linked font needs an explicit original color to prevent blue text");
   // A manually pre-populated block is never overwritten by imported events.
   const occupied=premerged.replace(/<c r="P25"[^>]*\/>/, '<c r="P25" s="2" t="inlineStr"><is><t>Already Assigned</t></is></c>');
   const result2=plotSheet(occupied,[e],layout,styled.styleIds,()=>"PM",x=>[x.name]);
