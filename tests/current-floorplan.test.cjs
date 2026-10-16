@@ -33,4 +33,25 @@ assert(merges(y.xml).includes("O28:S29"),"In-place update should retain Kelly's 
 assert(cell(y.xml,"O25").includes("40ppl"),"In-place guest update failed");
 assert(cell(y.xml,"O28").includes("Kelly"),"In-place update modified Kelly");
 assert.equal(workbookDayPaths('<sheets><sheet name="Monday 10.12" sheetId="1"/><sheet name="AM Monday 10.12" sheetId="2"/><sheet name="Tuesday 10.13" sheetId="3"/><sheet name="Tuesday 10.13 AM" sheetId="4"/><sheet name="Wednesday 10.14" sheetId="5"/><sheet name="Thursday 10.15" sheetId="7"/><sheet name="Friday 10.16" sheetId="9"/><sheet name="Saturday 10.17" sheetId="11"/><sheet name="Sunday 10.18" sheetId="12"/></sheets>')[4],"xl/worksheets/sheet9.xml");
+
+// Mid-shift employee sections span all ten AM/PM rows. They must remain
+// continuous until an event actually needs the space, then split without
+// losing the original staff shared string or font assignment.
+const tall='<worksheet><sheetData><row r="36">'+
+  '<c r="E36" s="62" t="s"><v>0</v></c>'+
+  '<c r="M36" s="91" t="s"><v>1</v></c></row>'+
+  '</sheetData><mergeCells count="2"><mergeCell ref="E36:L45"/><mergeCell ref="M36:T45"/></mergeCells></worksheet>';
+const richStyles={...styles,staff:()=>417};
+const longEvent={name:"New Midday Booking",bays:"101-103",start:"12:00",end:"15:00",guests:20,package:"Fajita",category:"Buffet",status:"Definite"};
+const shifted=reconcileDay(tall,["Aidan R DBL\nw/ Erick P","Violet B 12-8"],[longEvent],richStyles,display);
+assert.equal(shifted.placed,1,"Midday event should fit inside tall first-floor staff allocation");
+assert(merges(shifted.xml).includes("E39:L45"),"Remaining staffed merge must span the AM/PM divide");
+assert(merges(shifted.xml).includes("H36:L38"),"The adjacent upper staff section must remain merged");
+assert(merges(shifted.xml).includes("M36:T45"),"Unaffected 12–8 section must stay ten rows tall");
+assert(cell(shifted.xml,"E39").includes('t="s"><v>0</v>'),"Moved staff label lost its original rich/shared-string reference");
+assert(cell(shifted.xml,"E39").includes('s="417"'),"Moved staff label did not retain its source style and bottom alignment");
+assert(cell(shifted.xml,"M36").includes('t="s"><v>1</v>'),"Unrelated mid-shift staff label was changed");
+const keepLong=reconcileDay(tall,["Aidan R DBL\nw/ Erick P","Violet B 12-8"],[],richStyles,display);
+assert(merges(keepLong.xml).includes("E36:L45")&&merges(keepLong.xml).includes("M36:T45"),"Unchanged tall staffing merges were modified");
+assert(cell(keepLong.xml,"E36").includes('t="s"><v>0</v>'),"Unchanged 12–8 staff text was rewritten");
 console.log("PASS: moved birthday expands Kelly, preserves Bryce, in-place updates retain staffing, custom 16-sheet workbook selects real weekdays");
