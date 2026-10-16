@@ -99,7 +99,8 @@ function guessRowMeta(cells,title){
   const bays=/\b[123]\d{2}\s*[-–]\s*[123]\d{2}\b/.test(end[2]||"")?end[2]:
     end.slice(0,6).find(s=>/^\s*[123]\d{2}\s*(?:[-–]\s*[123]\d{2})?\s*$/.test(s))||"";
   const guest=String(end[5]||"").replace(/,/g,"").trim();
-  return {...times,bays,guests:/^\d+$/.test(guest)?+guest:null};
+  const money=(String(end[4]||"").replace(/,/g,"").match(/(?:USD\s*|\$)(\d+(?:\.\d{1,2})?)/i)||[])[1];
+  return {...times,bays,guests:/^\d+$/.test(guest)?+guest:null,amount:money?Number(money):null};
 }
 function tableCells(html){
   return [...html.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]\s*>/gi)].map(m=>textOfHtml(m[1]));
@@ -111,11 +112,11 @@ function parseRow(html,index,anchorName){
   const row=html.slice(start,end+5);
   return guessRowMeta(tableCells(row),anchorName);
 }
-export function extractSalesforceLinks(html){
+export function extractSalesforceLinks(html,originHint=""){
   const raw=String(html||"");
   const links=[],byName=new Map();
   const source=raw.match(/SourceURL:\s*(https:\/\/[^\s<]+)/i)?.[1]||"";
-  let base=safeSalesforceUrl(source);
+  let base=safeSalesforceUrl(source)||safeSalesforceUrl(originHint);
   if(!base){
     const first=[...raw.matchAll(/\bhref\s*=\s*["'](https:\/\/[^"']+)["']/gi)].find(m=>safeSalesforceUrl(m[1]));
     if(first)base=safeSalesforceUrl(first[1]);
@@ -164,10 +165,11 @@ function score(candidate,record){
   const start=Boolean(record.start&&candidate.start&&sameClock(record.start,candidate.start));
   const end=Boolean(record.end&&candidate.end&&sameClock(record.end,candidate.end));
   const bay=overlapRatio(record.bays,candidate.bays);
+  const amount=Number.isFinite(Number(record.amount))&&record.amount!==null&&record.amount!==undefined&&candidate.amount!==null&&candidate.amount!==undefined?Math.abs(Number(record.amount)-Number(candidate.amount)):null;
   const guest=record.guests!==null&&record.guests!==undefined&&candidate.guests!==null&&candidate.guests!==undefined
     ?Math.abs(Number(record.guests)-Number(candidate.guests)):null;
   let points=name*65+(name>=0.95?14:0)+(start?16:0)+(end?16:0)+
-    (bay!==null?(bay===1?29:Math.round(bay*23)):0)+(guest===0?13:guest!==null&&guest<=2?7:0);
+    (bay!==null?(bay===1?29:Math.round(bay*23)):0)+(guest===0?13:guest!==null&&guest<=2?7:0)+(amount!==null&&amount<=0.01?10:0);
   // Strong contradictory evidence should beat a superficially similar title.
   if(candidate.start&&record.start&&!start)points-=9;
   if(candidate.end&&record.end&&!end)points-=9;
