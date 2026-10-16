@@ -131,6 +131,17 @@ function setCell(xml,updates){
 }
 function eventCell(ref,text,style){return '<c r="'+ref+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+encode(text)+'</t></is></c>'}
 function blankCell(ref,style){return '<c r="'+ref+'" s="'+style+'"/>'}
+
+function relocateOriginalCell(cell,newAddress,newStyle){
+  // Keep the original cell body (shared string, formulas, inline rich-text
+  // runs, and character-level formatting) intact. Only the cell position and
+  // aligned style index are changed.
+  let tag=cell.tag.replace(/\br="[A-Z]{1,3}\d+"/,'r="'+newAddress+'"');
+  if(/\bs="\d+"/.test(tag))tag=tag.replace(/\bs="\d+"/,'s="'+newStyle+'"');
+  else tag=tag.replace(/<c\b/,'<c s="'+newStyle+'"');
+  return tag;
+}
+
 export function reconcileDay(xml,shared,events,styles,displayLines){
   const cells=readCellNodes(xml,shared);
   const mergeNodes=[...xml.matchAll(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*\/>/g)].map(m=>areaFromRef(m[1]));
@@ -184,7 +195,15 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
     }else changes.push({name:e.name,type:"added",before:"Not on floorplan",after:e.bays});
     for(const area of ranges)planned.push({area,event:e,old,inPlace:Boolean(old&&ref(old.area)===ref(area)),text:desiredText(e,displayLines,old)});
   }
-  if(!planned.length)return {xml,changes,warnings,placed:0};
+  if(!planned.length){
+    const alignment=new Map();
+    for(const block of staff){
+      const original=block.cell;
+      const style=styles.staff?styles.staff(original.style):styles.center(original.style);
+      alignment.set(block.address,relocateOriginalCell(original,block.address,style));
+    }
+    return {xml:setCell(xml,alignment),changes,warnings,placed:0};
+  }
   const updates=new Map(),deleted=new Set(),newMerges=mergeNodes.slice();
   const removing=new Set([...planned].filter(p=>!p.inPlace).map(p=>p.old).filter(Boolean));
   function removeMerge(a){const i=newMerges.findIndex(v=>ref(v)===ref(a));if(i>=0)newMerges.splice(i,1)}
@@ -208,7 +227,7 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
       addMerge(enlarged);
       const top=col(enlarged.c1)+enlarged.r1;
       updates.set(neighbor.address,blankCell(neighbor.address,styles.clear(neighbor.cell.style)));
-      updates.set(top,eventCell(top,neighbor.cell.text,styles.staff?styles.staff(neighbor.cell.style):styles.center(neighbor.cell.style)));
+      updates.set(top,relocateOriginalCell(neighbor.cell,top,styles.staff?styles.staff(neighbor.cell.style):styles.center(neighbor.cell.style)));
       neighbor.area=enlarged;
     }else{
       addMerge(old.area);
@@ -228,7 +247,7 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
         const best=staffFragment(pieces);
         updates.set(ownedStaff.address,blankCell(ownedStaff.address,styles.clear(ownedStaff.cell.style)));
         const anchor=col(best.c1)+best.r1;
-        updates.set(anchor,eventCell(anchor,ownedStaff.cell.text,styles.staff?styles.staff(ownedStaff.cell.style):styles.center(ownedStaff.cell.style)));
+        updates.set(anchor,relocateOriginalCell(ownedStaff.cell,anchor,styles.staff?styles.staff(ownedStaff.cell.style):styles.center(ownedStaff.cell.style)));
       }
     }
     if(!inPlace)addMerge(area);
