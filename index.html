@@ -58,9 +58,22 @@
         <div class="board-foot">Yellow: couch bays · White: high-tops · Click event to edit</div>
       </section>
       <aside class="right-col">
-        <section class="panel"><div class="panel-heading"><h3>Events</h3><span id="eventListCount" class="count-pill">0</span></div><div class="list-filters"><input type="search" id="eventSearch" placeholder="Search events or bays" aria-label="Search events"><select id="eventFilter" aria-label="Filter events"><option value="all">All events</option><option value="issues">Needs review</option><option value="AM">AM only</option><option value="PM">PM only</option></select></div><div id="eventList" class="event-list"></div><button id="addEvent" class="button subtle add-event" type="button">＋ Add event manually</button></section>
-        <section class="panel issues-panel"><div class="panel-heading"><h3>Review</h3><span id="issueCount" class="count-pill">0</span></div><div id="issues" class="issue-list"></div></section>
-        <section class="panel change-panel" id="changePanel" hidden><div class="panel-heading"><h3>Changes</h3><span id="changeCount" class="count-pill">0</span></div><div id="changeList" class="change-list"></div></section>
+        <details class="panel sidebar-section" id="eventsSection" open>
+          <summary class="panel-heading"><span class="side-title">Events</span><span class="section-meta"><span id="eventListCount" class="count-pill">0</span><span class="sidebar-chevron" aria-hidden="true">▾</span></span></summary>
+          <div class="sidebar-content">
+            <div class="list-filters"><input type="search" id="eventSearch" placeholder="Search events or bays" aria-label="Search events"><select id="eventFilter" aria-label="Filter events"><option value="all">All events</option><option value="issues">Needs review</option><option value="AM">AM only</option><option value="PM">PM only</option></select></div>
+            <div id="eventList" class="event-list"></div>
+            <button id="addEvent" class="button subtle add-event" type="button">＋ Add event manually</button>
+          </div>
+        </details>
+        <details class="panel change-panel sidebar-section" id="changePanel" open hidden>
+          <summary class="panel-heading"><span class="side-title">Changes</span><span class="section-meta"><span id="changeCount" class="count-pill">0</span><span class="sidebar-chevron" aria-hidden="true">▾</span></span></summary>
+          <div class="sidebar-content"><div id="changeList" class="change-list"></div></div>
+        </details>
+        <details class="panel issues-panel sidebar-section" id="reviewSection" open>
+          <summary class="panel-heading"><span class="side-title">Review</span><span class="section-meta"><span id="issueCount" class="count-pill">0</span><span class="sidebar-chevron" aria-hidden="true">▾</span></span></summary>
+          <div class="sidebar-content"><div id="issues" class="issue-list"></div></div>
+        </details>
       </aside>
     </div>
   </section>
