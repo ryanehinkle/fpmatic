@@ -66,4 +66,21 @@ assert(merges(relocated.xml).includes("O23:W24"),"Broad lower staff merge disapp
 assert(merges(relocated.xml).includes("O20:P22"),"Unoccupied side strip should remain");
 assert(cell(relocated.xml,"O23").includes("Izack P 930"),"Staff name should move to the bottom section");
 assert(!cell(relocated.xml,"O20").includes("Izack P 930"),"Staff name still stranded in the narrow strip");
+
+// Blank unmerged bays should become a single rectangular section, but do not
+// merge across an existing dark divider or swallow an employee label.
+const emptyGrid='<worksheet><sheetData><row r="4"><c r="E4" s="1"/><c r="F4" s="1"/><c r="G4" s="1"/></row>'+
+  '<row r="5"><c r="E5" s="1"/><c r="F5" s="1"/><c r="G5" s="1"/></row>'+
+  '</sheetData><mergeCells count="1"><mergeCell ref="H4:AL13"/></mergeCells></worksheet>';
+const blank=reconcileDay(emptyGrid,[],[],styles,display);
+assert(merges(blank.xml).includes("E4:G8"),"Blank AM bay section was not merged");
+assert(merges(blank.xml).includes("E9:G13"),"Blank PM bay section was not merged");
+const dividerStyles={...styles,hardDivider:(a,b,direction)=>direction==="vertical"&&a===1&&b===2};
+const divided=emptyGrid.replace('<c r="G4" s="1"/>','<c r="G4" s="2"/>').replace('<c r="G5" s="1"/>','<c r="G5" s="2"/>');
+const split=reconcileDay(divided,[],[],dividerStyles,display);
+assert(!merges(split.xml).some(m=>m==="E4:G8"),"Merged blank cells across a dark original divider");
+const labeled=emptyGrid.replace('<c r="F4" s="1"/>','<c r="F4" s="1" t="inlineStr"><is><t>Staff One</t></is></c>');
+const untouched=reconcileDay(labeled,[],[],styles,display);
+assert(cell(untouched.xml,"F4").includes("Staff One"),"Blank-area merging removed an employee label");
+assert(!merges(untouched.xml).some(m=>/^[A-Z]+\d+:[A-Z]+\d+$/.test(m)&&(()=>{const [a,b]=m.split(":");return a==="E4"&&b==="G8"})()),"Blank merge covered an employee");
 console.log("PASS: moved birthday expands Kelly, preserves Bryce, in-place updates retain staffing, custom 16-sheet workbook selects real weekdays");
