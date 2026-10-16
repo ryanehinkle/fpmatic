@@ -48,18 +48,30 @@ export function addSheetHyperlinks(xml,rels,items){
   }
   return {xml,rels:relationshipXml,added:hyperlinkTags.length};
 }
+function excelColumnNumber(s){return [...s].reduce((n,ch)=>n*26+ch.charCodeAt(0)-64,0)}
+function anchoredBayRanges(xml){
+  const out=new Map();
+  for(const m of xml.matchAll(/<mergeCell\b[^>]*ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"[^>]*\/>/g)){
+    const first=excelColumnNumber(m[1]),last=excelColumnNumber(m[3]),row=+m[2];
+    if(first<5||last>38||first>last)continue;
+    const floor=row>=36?1:row>=20?2:row>=4&&row<=13?3:0;
+    if(!floor)continue;
+    out.set(m[1]+m[2],(floor*100+first-4)+"-"+(floor*100+last-4));
+  }
+  return out;
+}
 export async function applyEventHyperlinks(zip,modified,dayPaths,shared,events,links,week,addDays){
   let added=0;
   for(let day=0;day<7;day++){
     const path=dayPaths[day],xml=modified.get(path);
     if(!path||!xml)continue;
-    const date=addDays(week,day),cells=parseFloorplanCell(xml,shared),items=[];
+    const date=addDays(week,day),cells=parseFloorplanCell(xml,shared),items=[],baysByAnchor=anchoredBayRanges(xml);
     for(const [ref,cell] of cells){
       if(!cell.text||!/^[A-Z]{1,3}\d+$/.test(ref))continue;
       const numeric=(ref.match(/\d+/)||[])[0],row=Number(numeric);
       // Event cells only, never a staffing or reference worksheet.
       if(![4,9,20,25,36,41].some(top=>row>=top&&row<=top+4))continue;
-      const url=linkForWorksheetText(cell.text,date,events,links);
+      const url=linkForWorksheetText(cell.text,date,events,links,baysByAnchor.get(ref)||"");
       if(url)items.push({ref,url});
     }
     if(!items.length)continue;
