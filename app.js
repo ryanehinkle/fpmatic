@@ -252,10 +252,18 @@ function previewFloorBoard(floor){
   }).join("");
   function forPeriod(part){
     const top={3:4,2:20,1:36}[floor]+(part==="PM"?5:0);
+    // The source XLSX merges display as solid sections with no internal gridlines.
+    // Draw them behind their real per-cell fills and text/borders.
+    const overlapping=snap.regions.filter(g=>g.area.r1<=top+4&&g.area.r2>=top);
+    const bases=overlapping.map(g=>{
+      const a=g.area,start=Math.max(a.r1,top),end=Math.min(a.r2,top+4);
+      const background=(!g.isStaff&&g.text&&g.fill&&g.fill!=="transparent")?g.fill:"#ffffff";
+      return '<div class="preview-merge-base" style="grid-column:'+(a.c1-4)+' / '+(a.c2-3)+';grid-row:'+(start-top+1)+' / span '+(end-start+1)+';background:'+background+'"></div>';
+    }).join("");
     const fills=(snap.fills||[]).filter(x=>x.r>=top&&x.r<=top+4).map(x=>
       '<div class="preview-cell-fill" style="grid-column:'+(x.c-4)+' / span 1;grid-row:'+(x.r-top+1)+';background:'+x.color+'"></div>'
     ).join("");
-    const html=snap.regions.filter(g=>g.area.r1<=top+4&&g.area.r2>=top).map(g=>{
+    const html=overlapping.map(g=>{
       const full=g.area;
       // A 12–8 assignment may span all ten AM/PM rows. The XLSX merge
       // remains untouched; this clips only what is displayed in each half.
@@ -273,7 +281,7 @@ function previewFloorBoard(floor){
       return '<div class="preview-region'+(visibleText?" has-text":"")+(g.isStaff?" staffing-label":"")+(event?" preview-event":"")+'"'+(event?' data-event="'+escapeHtml(event.id)+'"':'')+' style="'+css+'" title="'+escapeHtml(g.text||"")+'">'+
         (visibleText?'<span>'+escapeHtml(visibleText)+'</span>':"")+'</div>';
     }).join("");
-    return '<div class="period-wrap"><div class="period-label '+part.toLowerCase()+'">'+part+'</div><div class="event-grid preview-grid">'+fills+html+'</div></div>';
+    return '<div class="period-wrap"><div class="period-label '+part.toLowerCase()+'">'+part+'</div><div class="event-grid preview-grid">'+bases+fills+html+'</div></div>';
   }
   const label={1:"FIRST FLOOR",2:"SECOND FLOOR",3:"THIRD FLOOR"}[floor];
   return '<section class="floor-board"><div class="floor-title">'+label+'</div><div class="floor-main"><div class="landmarks">'+renderLandmarks(floor)+'</div><div class="bay-headers">'+hdr+'</div>'+forPeriod("AM")+forPeriod("PM")+'<div class="bay-headers">'+hdr+'</div></div></section>';
