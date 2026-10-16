@@ -143,3 +143,21 @@ body.is-landing .intro{margin:clamp(40px,12vh,130px) auto 0}
 .sidebar-section:not([open])>summary{border-bottom:0}
 .sidebar-section:not([open]){padding-bottom:0}
 .sidebar-section[hidden]{display:none!important}
+
+/* Excel final-pass: all text sits at the true center of its merged cell. */
+.preview-grid .preview-region,
+.preview-grid .preview-region.staffing-label,
+.preview-grid .preview-region:not(.staffing-label) {
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:2px;
+}
+.preview-grid .preview-region>span {
+  display:block;
+  max-width:100%;
+  max-height:100%;
+  overflow:hidden;
+  white-space:pre-line;
+  text-align:center;
+}
