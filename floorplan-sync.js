@@ -201,7 +201,16 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
     if(!inPlace)addMerge(area);
     for(let r=area.r1;r<=area.r2;r++)for(let c=area.c1;c<=area.c2;c++){
       const address=col(c)+r,sourceStyle=cells.get(address)?.style||old?.cell.style||0;
-      const style=styles.event(sourceStyle,event,r===area.r1&&c===area.c1?area.r2-area.r1+1===2:false);
+      const compact=area.r2-area.r1+1===2;
+      const edge={
+        left:c===area.c1?(c===5?"medium":"light"):null,
+        right:c===area.c2?(c===38?"medium":"light"):null,
+        top:r===area.r1?([4,9,20,25,36,41].includes(r)?"medium":"light"):null,
+        bottom:r===area.r2?([8,13,24,29,40,45].includes(r)?"medium":"light"):null
+      };
+      const style=(typeof styles.resolve==="function")?
+        styles.resolve(sourceStyle,event,compact,inPlace?null:edge):
+        styles.event(sourceStyle,event,compact);
       updates.set(address,r===area.r1&&c===area.c1?eventCell(address,text,style):blankCell(address,style));
     }
   }
