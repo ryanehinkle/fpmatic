@@ -320,6 +320,7 @@ async function refreshWorkbookPreview(){
     state.changesByDay=output.changesByDay||[];
     state.previewWarning=output.skipped?.length?output.skipped.join("\n"):"";
     render();
+    if(state.salesforceLinks.length){const coverage=workbookLinkCoverage();$("linkStatus").textContent="✓ "+coverage.matched+"/"+coverage.total;$("linkStatus").classList.add("link-finished");}
   }catch(error){
     if(token!==previewToken)return;
     console.error("Workbook preview failed",error);
