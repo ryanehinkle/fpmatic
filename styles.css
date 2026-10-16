@@ -196,3 +196,9 @@ body.is-landing .intro{margin:clamp(40px,12vh,130px) auto 0}
 @media(prefers-reduced-motion:reduce){.link-progress.link-processing::before{animation:none}.link-progress.link-finished{animation:none}}
 
 .link-clipboard-target{position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+
+/* One-button Salesforce import sits beside the weekly date selector. */
+.week-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px}
+.week-actions .link-import-button{white-space:nowrap}
+.week-actions .link-progress:empty{display:none}
+@media(max-width:850px){.top-row{flex-wrap:wrap}.week-actions{width:100%;justify-content:flex-end}}
