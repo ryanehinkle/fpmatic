@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FPmatic • Topgolf Floor Plans</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261013b">
+<link rel="stylesheet" href="styles.css?v=20261016b">
 </head>
 <body>
 <header class="site-header">
@@ -35,6 +35,10 @@
         <span class="report-file-name">Catering Menus</span>
         <span class="report-file-status" id="menuFileName">Choose CSV</span>
       </label>
+      <label class="report-file optional-report" for="currentInput" id="currentBox">
+        <span class="report-file-name">Current floorplan <span class="optional-label">(Optional)</span></span>
+        <span class="report-file-status" id="currentFileName">Choose XLSX</span>
+      </label>
     </div>
     <button id="buildFromReports" type="button" class="button primary upload-button" disabled>Build floor plan</button>
     <p class="report-feedback" id="reportFeedback" role="status" aria-live="polite"></p>
@@ -56,6 +60,7 @@
       <aside class="right-col">
         <section class="panel"><div class="panel-heading"><h3>Events</h3><span id="eventListCount" class="count-pill">0</span></div><div class="list-filters"><input type="search" id="eventSearch" placeholder="Search events or bays" aria-label="Search events"><select id="eventFilter" aria-label="Filter events"><option value="all">All events</option><option value="issues">Needs review</option><option value="AM">AM only</option><option value="PM">PM only</option></select></div><div id="eventList" class="event-list"></div><button id="addEvent" class="button subtle add-event" type="button">＋ Add event manually</button></section>
         <section class="panel issues-panel"><div class="panel-heading"><h3>Review</h3><span id="issueCount" class="count-pill">0</span></div><div id="issues" class="issue-list"></div></section>
+        <section class="panel change-panel" id="changePanel" hidden><div class="panel-heading"><h3>Changes</h3><span id="changeCount" class="count-pill">0</span></div><div id="changeList" class="change-list"></div></section>
       </aside>
     </div>
   </section>
@@ -85,9 +90,10 @@
 <input id="pdfInput" type="file" accept=".pdf,application/pdf" multiple hidden>
 <input id="staffInput" type="file" accept=".csv,text/csv" hidden>
 <input id="menuInput" type="file" accept=".csv,text/csv" hidden>
+<input id="currentInput" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
 <input id="csvInput" type="file" accept=".csv,text/csv" multiple hidden>
 <input id="templateInput" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
 <script src="./jszip.min.js?v=20261010d"></script>
-<script type="module" src="app.js?v=20261013c"></script>
+<script type="module" src="app.js?v=20261016b"></script>
 </body>
 </html>
