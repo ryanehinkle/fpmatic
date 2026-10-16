@@ -256,7 +256,7 @@ function previewFloorBoard(floor){
       const a=g.area,line=(g.text||"").split(/\r?\n/)[0].trim();
       const normalize=t=>String(t||"").toLowerCase().replace(/[^a-z0-9]/g,"");
       const event=dayEvents().find(e=>normalize(e.name)===normalize(line));
-      const css='grid-column:'+(a.c1-4)+' / '+(a.c2-2)+';grid-row:'+(a.r1-top+1)+' / span '+(a.r2-a.r1+1)+';background:'+(g.fill==="transparent"?"#ffffff":g.fill)+';'+
+      const css='grid-column:'+(a.c1-4)+' / '+(a.c2-3)+';grid-row:'+(a.r1-top+1)+' / span '+(a.r2-a.r1+1)+';background:'+(g.fill==="transparent"?"#ffffff":g.fill)+';'+
         ['left','right','top','bottom'].map(k=>'border-'+k+':'+g.borders[k]).join(';');
       return '<div class="preview-region'+(g.text?" has-text":"")+(event?" preview-event":"")+'"'+(event?' data-event="'+escapeHtml(event.id)+'"':'')+' style="'+css+'" title="'+escapeHtml(g.text||"")+'">'+
         (g.text?'<span>'+escapeHtml(g.text)+'</span>':"")+'</div>';
