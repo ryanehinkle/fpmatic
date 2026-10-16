@@ -94,7 +94,7 @@ export async function readWorkbookPreview(blob){
     const merges=[...xml.matchAll(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*\/>/g)].map(x=>fromRef(x[1])).filter(Boolean);
     for(const area of merges){
       if(area.c1<5||area.c2>38)continue;
-      const floor=floors.find(f=>[f.am,f.pm].some(r=>area.r1>=r&&area.r2<=r+4));
+      const floor=floors.find(f=>area.r1>=f.am&&area.r2<=f.pm+4);
       if(!floor)continue;
       for(let r=area.r1;r<=area.r2;r++)for(let c=area.c1;c<=area.c2;c++)covered.add(c+":"+r);
       let col=area.c1,letter="";while(col){col--;letter=String.fromCharCode(65+col%26)+letter;col=Math.floor(col/26)}
@@ -104,7 +104,7 @@ export async function readWorkbookPreview(blob){
       if(!cell.text.trim())continue;
       const p=toCell(addr);
       if(p.c<5||p.c>38||covered.has(p.c+":"+p.r))continue;
-      if(!floors.some(f=>[f.am,f.pm].some(r=>p.r>=r&&p.r<=r+4)))continue;
+      if(!floors.some(f=>p.r>=f.am&&p.r<=f.pm+4))continue;
       const area={c1:p.c,c2:p.c,r1:p.r,r2:p.r};
       regions.push(gridRegion(area,cell.text,cells,stylesheet));
     }
@@ -114,7 +114,7 @@ export async function readWorkbookPreview(blob){
     for(const [addr,cell] of cells){
       const p=toCell(addr);
       if(!p||p.c<5||p.c>38)continue;
-      if(!floors.some(f=>[f.am,f.pm].some(top=>p.r>=top&&p.r<=top+4)))continue;
+      if(!floors.some(f=>p.r>=f.am&&p.r<=f.pm+4))continue;
       const fill=styleFor(stylesheet,cell.style).fill;
       if(fill==="transparent"||!fill)continue;
       fills.push({c:p.c,r:p.r,color:fill});
