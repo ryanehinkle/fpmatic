@@ -64,6 +64,7 @@ const {plotSheet,recolorStyles}=vm.runInNewContext(source+"\n({plotSheet,recolor
   assert.equal(sideDetails("P26","left").color,"FF000000","Original left section border lost");
   assert.equal(sideDetails("AA26","right").color,"FF000000","Original right section border lost");
   // Tentative font should be black, not the former white override.
+  const staffStyleId=styled.styleIds.staff(0);
   const finalized=styled.finalize(styled.xml);
   const eventCell=(rendered.xml.match(/<c r="S25" s="(\d+)"/)||[])[1];
   assert(eventCell,"Missing event anchor");
@@ -72,6 +73,17 @@ const {plotSheet,recolorStyles}=vm.runInNewContext(source+"\n({plotSheet,recolor
   const fontId=Number((chosen.match(/fontId="(\d+)"/)||[])[1]);
   const fonts=[...(finalized.match(/<fonts\b[^>]*>([\s\S]*?)<\/fonts>/)||[])[1].matchAll(/<font(?:\s[^>]*)?>[\s\S]*?<\/font>|<font\/>/g)];
   assert(fonts[fontId][0].includes("FF000000"),"Tentative font must be black");
+  const allXfs=[...(finalized.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/)||[])[1].matchAll(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g)].map(x=>x[0]);
+  const centeredStaff=allXfs[staffStyleId];
+  assert(centeredStaff,"Missing generated staff alignment style");
+  assert(/<alignment\b[^>]*horizontal="center"/.test(centeredStaff),"Staff name is not horizontally centered");
+  assert(/<alignment\b[^>]*vertical="center"/.test(centeredStaff),"Staff name is not vertically centered");
+  const originalStyle=allXfs[0];
+  for(const attribute of ["fontId","fillId","borderId"]){
+    const value=(originalStyle.match(new RegExp("\\b"+attribute+'="(\\d+)"'))||[])[1]||"0";
+    const updated=(centeredStaff.match(new RegExp("\\b"+attribute+'="(\\d+)"'))||[])[1]||"0";
+    assert.equal(updated,value,"Centering altered original staff "+attribute);
+  }
   // A manually pre-populated block is never overwritten by imported events.
   const occupied=premerged.replace(/<c r="P25"[^>]*\/>/, '<c r="P25" s="2" t="inlineStr"><is><t>Already Assigned</t></is></c>');
   const result2=plotSheet(occupied,[e],layout,styled.styleIds,()=>"PM",x=>[x.name]);
