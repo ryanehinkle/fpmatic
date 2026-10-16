@@ -289,7 +289,9 @@ function previewFloorBoard(floor){
       const line=visibleText.split(/\r?\n/)[0].trim();
       const normalize=t=>String(t||"").toLowerCase().replace(/[^a-z0-9]/g,"");
       const event=dayEvents().find(e=>normalize(e.name)===normalize(line));
-      const link=event?.salesforceUrl||linkForWorksheetText(g.text,addDays(state.week,state.day),dayEvents(),state.salesforceLinks);
+      const floorNumber=full.r1>=36?1:full.r1>=20?2:3;
+      const previewBays=(floorNumber*100+full.c1-4)+"-"+(floorNumber*100+full.c2-4);
+      const link=event?.salesforceUrl||linkForWorksheetText(g.text,addDays(state.week,state.day),dayEvents(),state.salesforceLinks,previewBays);
       const safeLink=safeSalesforceUrl(link);
       const borders={...g.borders};
       if(full.r1<a.r1)borders.top="0";
@@ -493,36 +495,91 @@ async function exportWorkbook(){
     button.textContent=originalText;
   }
 }
-$("addLinks").addEventListener("click",()=>{
-  $("linksPaste").textContent="";
-  $("linksStatus").textContent=state.salesforceLinks.length+" saved Salesforce link"+(state.salesforceLinks.length===1?"":"s")+". Paste a Salesforce report below.";
-  $("salesforceLinksDialog").showModal();
-  $("linksPaste").focus();
+let pasteArmed=false,linkProgressFrame=0;
+function workbookLinkCoverage(){
+  const out=[];
+  if(state.preview?.days?.length){
+    for(let d=0;d<state.preview.days.length;d++){
+      const date=addDays(state.week,d);
+      for(const region of state.preview.days[d].regions||[]){
+        if(!region.text||!/\b\d+\s*ppl\b/i.test(region.text))continue;
+        const a=region.area,floor=a.r1>=36?1:a.r1>=20?2:3;
+        const bays=(floor*100+a.c1-4)+"-"+(floor*100+a.c2-4);
+        out.push({name:region.text.split(/\r?\n/)[0],date,
+          url:linkForWorksheetText(region.text,date,state.events,state.salesforceLinks,bays)});
+      }
+    }
+  }else for(const e of weeksEvents())out.push({name:e.name,date:e.date,url:e.salesforceUrl||""});
+  return {total:out.length,matched:out.filter(x=>x.url).length};
+}
+function updateLinkProgress(finalResult){
+  const status=$("linkStatus"),button=$("addLinks");
+  cancelAnimationFrame(linkProgressFrame);
+  const {total,matched}=finalResult;
+  let start=performance.now();
+  button.classList.add("link-complete");
+  const draw=now=>{
+    const ratio=Math.min(1,(now-start)/390);
+    const shown=Math.round(matched*(1-Math.pow(1-ratio,3)));
+    status.textContent=(ratio===1?"✓ ":"") + shown+"/"+total;
+    if(ratio<1)linkProgressFrame=requestAnimationFrame(draw);
+    else {status.classList.remove("link-processing");status.classList.add("link-finished");button.textContent="Add links";}
+  };
+  linkProgressFrame=requestAnimationFrame(draw);
+}
+async function processSalesforcePaste(html){
+  pasteArmed=false;
+  const button=$("addLinks"),status=$("linkStatus");
+  button.textContent="Matching…";button.disabled=true;
+  status.textContent="Scanning…";status.classList.add("link-processing");status.classList.remove("link-finished");
+  try{
+    const links=extractSalesforceLinks(html);
+    if(!links.length){
+      status.textContent="No Salesforce links found";
+      notify("Copy the Salesforce report with its links, then click Add links and paste.");
+      return;
+    }
+    const combined=new Map(state.salesforceLinks.map(x=>[canonicalOpportunity(x.name),x]));
+    for(const link of links)combined.set(canonicalOpportunity(link.name),link);
+    state.salesforceLinks=[...combined.values()];
+    const matchedEvents=attachSalesforceLinks();
+    render(); // persists report links for each event
+    const coverage=workbookLinkCoverage();
+    updateLinkProgress(coverage);
+    notify(links.length+" report links read · "+matchedEvents+" events matched · "+coverage.matched+"/"+coverage.total+" floorplan blocks linked");
+  }catch(error){
+    console.error("Salesforce paste:",error);
+    status.textContent="Could not read report links";
+    notify(error.message||String(error));
+  }finally{button.disabled=false;button.textContent="Add links";}
+}
+$("addLinks").addEventListener("click",async()=>{
+  const button=$("addLinks"),status=$("linkStatus");
+  pasteArmed=true;button.textContent="Press Ctrl+V";
+  button.classList.remove("link-complete");
+  status.textContent="Ready to paste";status.classList.remove("link-finished");
+  button.focus();
+  if(!navigator.clipboard?.read)return;
+  try{
+    // Modern Chromium can read the HTML directly on this click. When blocked,
+    // the same focused button accepts an ordinary Ctrl+V without a dialog.
+    const items=await navigator.clipboard.read();
+    for(const item of items){
+      if(!item.types.includes("text/html"))continue;
+      const blob=await item.getType("text/html");
+      const rich=await blob.text();
+      if(extractSalesforceLinks(rich).length){
+        await processSalesforcePaste(rich);
+        return;
+      }
+    }
+  }catch(error){console.info("Direct clipboard read unavailable; Ctrl+V remains armed.",error);}
 });
-$("closeLinks").addEventListener("click",()=>$("salesforceLinksDialog").close());
-$("doneLinks").addEventListener("click",()=>$("salesforceLinksDialog").close());
-$("clearLinks").addEventListener("click",()=>{
-  state.salesforceLinks=[];
-  attachSalesforceLinks();
-  $("linksPaste").textContent="";
-  $("linksStatus").textContent="All Salesforce links cleared.";
-  render();
-});
-$("linksPaste").addEventListener("paste",e=>{
-  e.preventDefault();
-  const rich=e.clipboardData?.getData("text/html")||"";
-  const links=extractSalesforceLinks(rich);
-  if(!links.length){
-    $("linksStatus").textContent="No hyperlinks found. Copy directly from the Salesforce report, then paste here (not plain text).";
-    return;
-  }
-  const all=new Map(state.salesforceLinks.map(item=>[canonicalOpportunity(item.name),item]));
-  for(const item of links)all.set(canonicalOpportunity(item.name),item);
-  state.salesforceLinks=[...all.values()];
-  const matched=attachSalesforceLinks();
-  $("linksPaste").textContent=links.length+" linked opportunities pasted";
-  $("linksStatus").textContent=links.length+" links detected · "+matched+" events matched · "+state.salesforceLinks.length+" stored. Shift+click an event to edit.";
-  render();
+document.addEventListener("paste",event=>{
+  if(!pasteArmed)return;
+  const html=event.clipboardData?.getData("text/html")||"";
+  event.preventDefault();
+  processSalesforcePaste(html);
 });
 $("staffInput").addEventListener("change",async e=>{try{await registerCsvFile(e.target.files[0],"staffing")}catch(error){$("reportFeedback").textContent=error.message;notify(error.message)}e.target.value=""});
 $("menuInput").addEventListener("change",async e=>{try{await registerCsvFile(e.target.files[0],"menus")}catch(error){$("reportFeedback").textContent=error.message;notify(error.message)}e.target.value=""});
