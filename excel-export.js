@@ -1,4 +1,4 @@
-import {reconcileDay,workbookDayPaths,parseFloorplanShared} from "./floorplan-sync.js?v=20261016e";
+import {reconcileDay,workbookDayPaths,parseFloorplanShared} from "./floorplan-sync.js?v=20261016g";
 import {applyEventHyperlinks} from "./sheet-hyperlinks.js?v=20261016g";
 /*
  * Format-preserving Excel export for FPmatic.
