@@ -1,3 +1,4 @@
+import {reconcileDay,workbookDayPaths,parseFloorplanShared} from "./floorplan-sync.js?v=20261016a";
 /*
  * Format-preserving Excel export for FPmatic.
  * We never read the original workbook through XLSX parsers or rebuild worksheets.
@@ -38,7 +39,7 @@ function recolorStyles(xml){
       if(rgb)colorToFill.set(rgb.toUpperCase(),index);
     });
     let appended="";
-    for(const color of Object.values(COLORS).flat()){
+    for(const color of [...Object.values(COLORS).flat(),"FFFFFF"]){
       if(colorToFill.has(color))continue;
       colorToFill.set(color,count++);
       appended+='<fill><patternFill patternType="solid"><fgColor rgb="FF'+color+'"/><bgColor indexed="64"/></patternFill></fill>';
@@ -142,6 +143,14 @@ function recolorStyles(xml){
     },
     center(baseIndex){
       return createStyle(baseIndex,null,null,null,true);
+    },
+    clear(baseIndex){
+      return createStyle(baseIndex,colorToFill.get("FFFFFF"),null,null,true);
+    },
+    event(baseIndex,event,compact=false){
+      const category=COLORS[event.category]?event.category:"Flex";
+      const rgb=COLORS[category][event.status==="Tentative"?1:0];
+      return createStyle(baseIndex,colorToFill.get(rgb),fontIds[(compact?"compact":"normal")+"Black"],null,true);
     }
   };
 
@@ -448,7 +457,7 @@ async function downloadBinary(data,name){
   anchor.href=url;anchor.download=name;document.body.appendChild(anchor);anchor.click();anchor.remove();
   setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
-export async function exportExactFloorPlan({state,weekEvents,layoutDay,period,displayLines,addDays}){
+export async function buildExactFloorPlan({state,weekEvents,layoutDay,period,displayLines,addDays}){
   if(typeof JSZip!=="function")throw new Error("Local ZIP export library failed to load");
   const masterBytes=state.master||(await (async()=>{
     const response=await fetch("./master.xlsx",{cache:"no-cache"});
@@ -459,27 +468,43 @@ export async function exportExactFloorPlan({state,weekEvents,layoutDay,period,di
   const styleFile=zip.file("xl/styles.xml");
   if(!styleFile)throw new Error("Original master has no Excel formatting table");
   const {xml:updatedStyles,styleIds,finalize}=recolorStyles(await styleFile.async("string"));
-  // Do not touch any other workbook part besides styles.xml and event bay cells.
-  const modified=new Map();
-  let count=0;const skipped=[];
-  for(let day=0;day<7;day++){
-    const path="xl/worksheets/sheet"+(day+1)+".xml";
-    const original=zip.file(path);
-    if(!original)throw new Error("The master is missing the "+DAYS[day]+" worksheet");
-    const events=weekEvents.filter(e=>e.date===addDays(state.week,day));
-    const {xml,count:dayCount,skipped:daySkipped}=plotSheet(await original.async("string"),events,layoutDay(events),styleIds,period,displayLines);
-    skipped.push(...daySkipped.map(item=>DAYS[day]+": "+item));
-    modified.set(path,xml);
-    count+=dayCount;
-  }
   const workbookFile=zip.file("xl/workbook.xml");
   if(!workbookFile)throw new Error("Excel master is missing the worksheet names");
   const workbookXml=await workbookFile.async("string");
+  const dayPaths=workbookDayPaths(workbookXml);
+  const sharedFile=zip.file("xl/sharedStrings.xml");
+  const shared=sharedFile?parseFloorplanShared(await sharedFile.async("string")):[];
+  const modified=new Map(),changesByDay=[],skipped=[];
+  let count=0;
+  for(let day=0;day<7;day++){
+    const path=dayPaths[day];
+    if(!path)throw new Error("Missing "+DAYS[day]+" worksheet");
+    const original=zip.file(path);
+    if(!original)throw new Error("Could not find "+DAYS[day]+" worksheet data");
+    const events=weekEvents.filter(e=>e.date===addDays(state.week,day));
+    if(state.master){
+      const result=reconcileDay(await original.async("string"),shared,events,styleIds,displayLines);
+      modified.set(path,result.xml);
+      count+=result.placed;
+      changesByDay[day]=result.changes;
+      skipped.push(...result.warnings.map(w=>DAYS[day]+": "+w));
+    }else{
+      const result=plotSheet(await original.async("string"),events,layoutDay(events),styleIds,period,displayLines);
+      modified.set(path,result.xml);
+      count+=result.count;
+      changesByDay[day]=[];
+      skipped.push(...result.skipped.map(w=>DAYS[day]+": "+w));
+    }
+  }
   zip.file("xl/workbook.xml",renameWeeklyTabs(workbookXml,state.week,addDays));
   zip.file("xl/styles.xml",finalize(updatedStyles));
   for(const [path,xml] of modified)zip.file(path,xml);
   const result=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
   const filename=formatDownloadDate(state.week)+" - "+formatDownloadDate(addDays(state.week,6))+" Floorplan.xlsx";
-  await downloadBinary(result,filename);
-  return {filename,events:count,skipped};
+  return {blob:result,filename,events:count,skipped,changesByDay};
+}
+export async function exportExactFloorPlan(options){
+  const result=await buildExactFloorPlan(options);
+  await downloadBinary(result.blob,result.filename);
+  return result;
 }
