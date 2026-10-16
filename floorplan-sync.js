@@ -11,7 +11,7 @@ function ref(a){return col(a.c1)+a.r1+":"+col(a.c2)+a.r2}
 function areaFromRef(s){const [a,b=a]=s.split(":"),x=loc(a),y=loc(b);return {c1:x.c,c2:y.c,r1:x.r,r2:y.r}}
 function hit(a,b){return a.c1<=b.c2&&a.c2>=b.c1&&a.r1<=b.r2&&a.r2>=b.r1}
 function contains(a,c,r){return c>=a.c1&&c<=a.c2&&r>=a.r1&&r<=a.r2}
-function subtract(a,b){if(!hit(a,b))return [a];const k={c1:Math.max(a.c1,b.c1),c2:Math.min(a.c2,b.c2),r1:Math.max(a.r1,b.r1),r2:Math.min(a.r2,b.r2)};const x=[];if(a.r1<k.r1)x.push({...a,r2:k.r1-1});if(k.r2<a.r2)x.push({...a,r1:k.r2+1});if(a.c1<k.c1)x.push({c1:a.c1,c2:k.c1-1,r1:k.r1,r2:k.r2});if(k.c2<a.c2)x.push({c1:k.c2,c2:a.c2,r1:k.r1,r2:k.r2});return x}
+function subtract(a,b){if(!hit(a,b))return [a];const k={c1:Math.max(a.c1,b.c1),c2:Math.min(a.c2,b.c2),r1:Math.max(a.r1,b.r1),r2:Math.min(a.r2,b.r2)};const x=[];if(a.r1<k.r1)x.push({...a,r2:k.r1-1});if(k.r2<a.r2)x.push({...a,r1:k.r2+1});if(a.c1<k.c1)x.push({c1:a.c1,c2:k.c1-1,r1:k.r1,r2:k.r2});if(k.c2<a.c2)x.push({c1:k.c2+1,c2:a.c2,r1:k.r1,r2:k.r2});return x}
 function normalized(s){return String(s||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z0-9]/g,"")}
 function decode(s){return String(s||"").replace(/&(?:amp|lt|gt|quot|apos|#(\d+)|#x([a-f0-9]+));/gi,(m,dec,hex)=>dec?String.fromCharCode(+dec):hex?String.fromCharCode(parseInt(hex,16)):({"&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"',"&apos;":"'"}[m]||m))}
 function encode(s){return String(s??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[ch]))}
