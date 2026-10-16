@@ -277,9 +277,9 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
     // sections should still be merged without touching its staffing.
     const finalMerges=mergeNodes.slice();
     finalMerges.push(...mergeUnoccupiedSections(finalMerges,cells,alignment,styles));
-    const rebuilt=resultXml.replace(/<mergeCells\\b([^>]*)>[\\s\\S]*?<\\/mergeCells>/,block=>
-      block.replace(/\\bcount="\\d+"/,'count="'+finalMerges.length+'"')
-        .replace(/<mergeCell\\b[^>]*\\/>/g,"")
+    const rebuilt=resultXml.replace(/<mergeCells\b([^>]*)>[\s\S]*?<\/mergeCells>/,block=>
+      block.replace(/\bcount="\d+"/,'count="'+finalMerges.length+'"')
+        .replace(/<mergeCell\b[^>]*\/>/g,"")
         .replace("</mergeCells>",finalMerges.map(m=>'<mergeCell ref="'+ref(m)+'"/>').join("")+"</mergeCells>"));
     return {xml:rebuilt,changes,warnings,placed:0};
   }
