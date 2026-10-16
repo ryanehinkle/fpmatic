@@ -120,3 +120,26 @@ body.is-landing .intro{margin:clamp(40px,12vh,130px) auto 0}
 .preview-grid .preview-region.staffing-label >span{
   overflow:visible;max-height:none;
 }
+
+
+/* Workbook-preview layering: merged white surfaces hide the workbook's
+   suppressed gridlines; individual Excel cell fills sit on top. */
+.preview-grid .preview-merge-base{z-index:1;min-width:0;min-height:0;pointer-events:none}
+.preview-grid .preview-cell-fill{z-index:2}
+.preview-grid .preview-region{z-index:3;background:transparent}
+.preview-grid .preview-region.has-text{z-index:4}
+.preview-grid .preview-region.staffing-label{align-items:flex-end;justify-content:center;text-align:center;padding-bottom:6px}
+.preview-grid .preview-region:not(.staffing-label){align-items:center;justify-content:center;text-align:center}
+
+/* Native, keyboard-accessible collapsible sidebar: Events / Changes / Review. */
+.right-col .sidebar-section{min-width:0}
+.sidebar-section>summary{list-style:none;cursor:pointer;user-select:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sidebar-section>summary::-webkit-details-marker{display:none}
+.sidebar-section .side-title{font-size:1rem;font-weight:850}
+.sidebar-section .section-meta{display:flex;align-items:center;gap:10px}
+.sidebar-section .sidebar-chevron{font-size:1.2rem;color:#99a4b2;display:inline-block;transition:transform .15s}
+.sidebar-section:not([open]) .sidebar-chevron{transform:rotate(-90deg)}
+.sidebar-section>summary:focus-visible{outline:2px solid #78a8d8;outline-offset:-2px}
+.sidebar-section:not([open])>summary{border-bottom:0}
+.sidebar-section:not([open]){padding-bottom:0}
+.sidebar-section[hidden]{display:none!important}
