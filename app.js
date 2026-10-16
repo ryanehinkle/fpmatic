@@ -558,7 +558,8 @@ $("addLinks").addEventListener("click",async()=>{
   pasteArmed=true;button.textContent="Press Ctrl+V";
   button.classList.remove("link-complete");
   status.textContent="Ready to paste";status.classList.remove("link-finished");
-  button.focus();
+  $("linkClipboardTarget").textContent="";
+  $("linkClipboardTarget").focus();
   if(!navigator.clipboard?.read)return;
   try{
     // Modern Chromium can read the HTML directly on this click. When blocked,
@@ -574,6 +575,13 @@ $("addLinks").addEventListener("click",async()=>{
       }
     }
   }catch(error){console.info("Direct clipboard read unavailable; Ctrl+V remains armed.",error);}
+});
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape"&&pasteArmed){
+    pasteArmed=false;
+    $("addLinks").textContent="Add links";
+    $("linkStatus").textContent="";
+  }
 });
 document.addEventListener("paste",event=>{
   if(!pasteArmed)return;
