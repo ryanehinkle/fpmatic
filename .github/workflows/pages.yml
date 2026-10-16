@@ -29,6 +29,8 @@ jobs:
         run: node tests/premerged-master.test.cjs
       - name: Verify current floorplan reconciliation
         run: node tests/current-floorplan.test.cjs
+      - name: Verify sidebar and merged preview layout
+        run: node tests/sidebar-preview.test.cjs
       - name: Verify workbook-derived preview
         run: node tests/live-preview.test.cjs
       - name: Check browser module syntax
