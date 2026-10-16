@@ -87,11 +87,17 @@ function floorBayBand(area){
   ].some(([top,bottom])=>area.r1>=top&&area.r2<=bottom);
 }
 function staffFragment(pieces){
-  // Keep the staff name in a lower section where possible, as in the source
-  // floor plan. Never put it inside the new event.
+  // Prefer a usable, wide lower section. Avoid a narrow side sliver which
+  // would wrap a staff name vertically even though a full-width lower
+  // fragment is available.
+  const width=x=>x.c2-x.c1+1,area=x=>width(x)*(x.r2-x.r1+1);
+  const maxWidth=Math.max(...pieces.map(width));
+  const enough=x=>width(x)>=Math.min(3,maxWidth);
   return pieces.slice().sort((a,b)=>
+    Number(enough(b))-Number(enough(a))||
     b.r2-a.r2||
-    (b.c2-b.c1+1)*(b.r2-b.r1+1)-(a.c2-a.c1+1)*(a.r2-a.r1+1)
+    area(b)-area(a)||
+    width(b)-width(a)
   )[0];
 }
 function parseBays(s){
@@ -243,11 +249,21 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
       const pieces=subtract(existing,area).filter(x=>x.c1<=x.c2&&x.r1<=x.r2);
       if(ownedStaff&& !pieces.length){warnings.push(event.name+": staff block fully covered");continue}
       for(const piece of pieces)addMerge(piece);
-      if(ownedStaff&&contains(area,ownedStaff.area.c1,ownedStaff.area.r1)&&pieces.length){
+      if(ownedStaff&&pieces.length){
+        // Any cut can strand the staffing anchor in a 1-bay sliver even when
+        // the new event never covers that anchor (Izack is an example).
+        // Move the original styled cell into the best remaining lower area.
         const best=staffFragment(pieces);
-        updates.set(ownedStaff.address,blankCell(ownedStaff.address,styles.clear(ownedStaff.cell.style)));
+        const previous=ownedStaff.address;
         const anchor=col(best.c1)+best.r1;
+        if(previous!==anchor){
+          updates.set(previous,blankCell(previous,styles.clear(ownedStaff.cell.style)));
+        }
         updates.set(anchor,relocateOriginalCell(ownedStaff.cell,anchor,styles.staff?styles.staff(ownedStaff.cell.style):styles.center(ownedStaff.cell.style)));
+        // Subsequent events on the same day must recognize the new staff
+        // fragment and new text anchor, rather than the pre-split merge.
+        ownedStaff.area=best;
+        ownedStaff.address=anchor;
       }
     }
     if(!inPlace)addMerge(area);
