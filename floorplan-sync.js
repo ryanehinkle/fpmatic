@@ -81,6 +81,19 @@ function pickRow(e,range,staffAreas,protectedEvents,reserved,preferred){
   }
   return null;
 }
+function floorBayBand(area){
+  return area.c1>=5&&area.c2<=38&&[
+    [4,13],[20,29],[36,45]
+  ].some(([top,bottom])=>area.r1>=top&&area.r2<=bottom);
+}
+function staffFragment(pieces){
+  // Keep the staff name in a lower section where possible, as in the source
+  // floor plan. Never put it inside the new event.
+  return pieces.slice().sort((a,b)=>
+    b.r2-a.r2||
+    (b.c2-b.c1+1)*(b.r2-b.r1+1)-(a.c2-a.c1+1)*(a.r2-a.r1+1)
+  )[0];
+}
 function parseBays(s){
   const ranges=[];
   for(const m of String(s||"").matchAll(/(\d{3})(?:\s*[-–]\s*(\d{3}))?/g)){
@@ -137,7 +150,7 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
   const staff=mergeNodes.flatMap(area=>{
     const address=col(area.c1)+area.r1,cell=cells.get(address);
     if(!cell?.text.trim()||original.some(o=>o.address===address))return [];
-    if(area.c1<5||area.c2>38||!EVENT_ROWS.some(([a,b])=>area.r1>=a&&area.r2<=b))return [];
+    if(!floorBayBand(area))return [];
     return [{area,cell,address}];
   });
   const changes=[],warnings=[],planned=[],reserved=[];
@@ -195,7 +208,7 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
       addMerge(enlarged);
       const top=col(enlarged.c1)+enlarged.r1;
       updates.set(neighbor.address,blankCell(neighbor.address,styles.clear(neighbor.cell.style)));
-      updates.set(top,eventCell(top,neighbor.cell.text,styles.center(neighbor.cell.style)));
+      updates.set(top,eventCell(top,neighbor.cell.text,styles.staff?styles.staff(neighbor.cell.style):styles.center(neighbor.cell.style)));
       neighbor.area=enlarged;
     }else{
       addMerge(old.area);
@@ -212,10 +225,10 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
       if(ownedStaff&& !pieces.length){warnings.push(event.name+": staff block fully covered");continue}
       for(const piece of pieces)addMerge(piece);
       if(ownedStaff&&contains(area,ownedStaff.area.c1,ownedStaff.area.r1)&&pieces.length){
-        const best=pieces.slice().sort((a,b)=>(b.c2-b.c1+1)*(b.r2-b.r1+1)-(a.c2-a.c1+1)*(a.r2-a.r1+1))[0];
+        const best=staffFragment(pieces);
         updates.set(ownedStaff.address,blankCell(ownedStaff.address,styles.clear(ownedStaff.cell.style)));
         const anchor=col(best.c1)+best.r1;
-        updates.set(anchor,eventCell(anchor,ownedStaff.cell.text,styles.center(ownedStaff.cell.style)));
+        updates.set(anchor,eventCell(anchor,ownedStaff.cell.text,styles.staff?styles.staff(ownedStaff.cell.style):styles.center(ownedStaff.cell.style)));
       }
     }
     if(!inPlace)addMerge(area);
@@ -233,6 +246,21 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
         styles.event(sourceStyle,event,compact);
       updates.set(address,r===area.r1&&c===area.c1?eventCell(address,text,style):blankCell(address,style));
     }
+  }
+  // Preserve original staff text and font colors, but keep each name at the
+  // bottom of its own section (including tall 12–8 AM/PM allocations).
+  for(const allocation of staff){
+    const address=col(allocation.area.c1)+allocation.area.r1;
+    if(updates.has(address))continue;
+    const base=cells.get(address);
+    if(!base||!base.text.trim())continue;
+    const align=styles.staff?styles.staff(base.style):styles.center(base.style);
+    // Only modify the style attribute. Shared strings, rich text, and all
+    // other source-cell properties remain byte-for-byte unchanged.
+    const original=base.tag;
+    updates.set(address,/\bs="\d+"/.test(original)
+      ?original.replace(/\bs="\d+"/,'s="'+align+'"')
+      :original.replace(/<c\b/,'<c s="'+align+'"'));
   }
   xml=setCell(xml,updates);
   const unique=[...new Map(newMerges.map(m=>[ref(m),m])).values()];
