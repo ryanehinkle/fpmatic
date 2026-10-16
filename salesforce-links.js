@@ -105,7 +105,7 @@ function tableCells(html){
   return [...html.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]\s*>/gi)].map(m=>textOfHtml(m[1]));
 }
 function parseRow(html,index,anchorName){
-  const upto=html.slice(0,index),start=upto.search(/<tr\b[^>]*>[^]*$/i);
+  const upto=html.slice(0,index),start=upto.toLowerCase().lastIndexOf("<tr");
   const end=html.indexOf("</tr>",index);
   if(start<0||end<0)return {};
   const row=html.slice(start,end+5);
@@ -197,7 +197,7 @@ export function matchingSalesforceLink(record,links){
 export function linkForWorksheetText(text,date,events,links,bays=""){
   const lines=String(text||"").split(/\r?\n/);
   const name=lines[0]?.trim()||"";
-  if(!name||!/\b\d+\s*ppl\b/i.test(text||""))return null;
+  if(!name)return null;
   const times=floorplanTime(text);
   const guests=Number((String(text).match(/(\d+)\s*ppl/i)||[])[1]);
   const record={name,date,start:times.start,end:times.end,
