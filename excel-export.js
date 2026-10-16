@@ -93,22 +93,22 @@ function recolorStyles(xml){
     borderCache.set(key,id);
     return id;
   }
-  function centeredAlignment(original){
+  function centeredAlignment(original,vertical="center"){
     const alignment=original.match(/<alignment\b[^>]*\/>/);
     if(alignment){
       // Preserve rotation, indentation, etc. of pre-existing MOD labels.
       let next=alignment[0];
       next=setAttribute(next,"horizontal","center");
-      next=setAttribute(next,"vertical","center");
+      next=setAttribute(next,"vertical",vertical);
       next=setAttribute(next,"wrapText",1);
       return original.replace(alignment[0],next);
     }
-    const alignmentTag='<alignment horizontal="center" vertical="center" wrapText="1"/>';
+    const alignmentTag='<alignment horizontal="center" vertical="'+vertical+'" wrapText="1"/>';
     const opening=original.match(/^<xf\b[^>]*\/>/);
     if(opening)return original.replace(/\/>$/,'>'+alignmentTag+'</xf>');
     return original.replace("</xf>",alignmentTag+"</xf>");
   }
-  function cloneBaseXf(baseIndex,fillId,fontId,borderId,center){
+  function cloneBaseXf(baseIndex,fillId,fontId,borderId,center,vertical="center"){
     let original=originals[baseIndex];
     if(!original)throw new Error("Unknown style "+baseIndex+" in master");
     const opening=original.match(/^<xf\b[^>]*\/?>/);
@@ -119,14 +119,14 @@ function recolorStyles(xml){
     if(borderId!==null){next=setAttribute(next,"borderId",borderId);next=setAttribute(next,"applyBorder",1)}
     if(center)next=setAttribute(next,"applyAlignment",1);
     original=original.replace(opening[0],next);
-    return center?centeredAlignment(original):original;
+    return center?centeredAlignment(original,vertical):original;
   }
-  function createStyle(baseIndex,fillId,fontId,sides,center){
+  function createStyle(baseIndex,fillId,fontId,sides,center,vertical="center"){
     const borderId=addBorder(sides);
-    const key=[baseIndex,fillId,fontId,borderId,center?1:0].join(":");
+    const key=[baseIndex,fillId,fontId,borderId,center?1:0,vertical].join(":");
     if(!cached.has(key)){
       cached.set(key,originals.length+created.length);
-      created.push(cloneBaseXf(baseIndex,fillId,fontId,borderId,center));
+      created.push(cloneBaseXf(baseIndex,fillId,fontId,borderId,center,vertical));
     }
     return cached.get(key);
   }
@@ -143,6 +143,11 @@ function recolorStyles(xml){
     },
     center(baseIndex){
       return createStyle(baseIndex,null,null,null,true);
+    },
+    staff(baseIndex){
+      // Only vertical alignment changes. The source XLSX font/color, fill,
+      // borders and custom styling are retained exactly.
+      return createStyle(baseIndex,null,null,null,true,"bottom");
     },
     clear(baseIndex){
       return createStyle(baseIndex,colorToFill.get("FFFFFF"),null,null,true);
