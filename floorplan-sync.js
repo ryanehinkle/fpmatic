@@ -148,6 +148,65 @@ function relocateOriginalCell(cell,newAddress,newStyle){
   return tag;
 }
 
+function mergeUnoccupiedSections(existing,sourceCells,updatedCells,styles){
+  // A source floorplan can contain standalone grid cells where the event area
+  // should be one blank merged section. Join only genuinely empty bay cells
+  // inside each floor's AM or PM zone. Pre-existing merges and any populated
+  // cells (including moved staff names) are protected.
+  const occupied=new Set();
+  const key=(c,r)=>c+":"+r;
+  for(const m of existing){
+    if(m.c2<5||m.c1>38)continue;
+    for(let r=m.r1;r<=m.r2;r++)for(let c=Math.max(m.c1,5);c<=Math.min(m.c2,38);c++)
+      occupied.add(key(c,r));
+  }
+  const valuePresent=tag=>/<(?:v|is|f)\b/.test(tag||"");
+  for(const [address,cell] of sourceCells){
+    const p=loc(address);if(!p||p.c<5||p.c>38)continue;
+    const edited=updatedCells.get(address);
+    if(valuePresent(edited===undefined?cell.tag:edited))occupied.add(key(p.c,p.r));
+  }
+  for(const [address,tag] of updatedCells){
+    if(!valuePresent(tag))continue;
+    const p=loc(address);if(p&&p.c>=5&&p.c<=38)occupied.add(key(p.c,p.r));
+  }
+  const free=(c,r)=>!occupied.has(key(c,r));
+  const hard=(c1,r1,c2,r2,side)=>{
+    if(typeof styles.hardDivider!=="function")return false;
+    const a=sourceCells.get(col(c1)+r1)?.style??0;
+    const b=sourceCells.get(col(c2)+r2)?.style??0;
+    return styles.hardDivider(a,b,side);
+  };
+  const result=[];
+  for(const [top,bottom] of EVENT_ROWS){
+    for(let row=top;row<=bottom;row++)for(let c=5;c<=38;c++){
+      if(!free(c,row))continue;
+      let best={c1:c,c2:c,r1:row,r2:row},maxArea=1;
+      // Grow each rectangle from this empty top-left cell. Respect visible
+      // section dividers in the uploaded workbook, never only cell gridlines.
+      for(let right=c;right<=38;right++){
+        if(!free(right,row)||right>c&&hard(right-1,row,right,row,"vertical"))break;
+        for(let bottomRow=row;bottomRow<=bottom;bottomRow++){
+          let canGrow=true;
+          for(let x=c;x<=right;x++){
+            if(!free(x,bottomRow)||(bottomRow>row&&hard(x,bottomRow-1,x,bottomRow,"horizontal"))){
+              canGrow=false;break;
+            }
+          }
+          if(!canGrow)break;
+          const candidate=(right-c+1)*(bottomRow-row+1);
+          if(candidate>maxArea||(candidate===maxArea&&bottomRow-row>best.r2-best.r1)){
+            maxArea=candidate;best={c1:c,c2:right,r1:row,r2:bottomRow};
+          }
+        }
+      }
+      for(let y=best.r1;y<=best.r2;y++)for(let x=best.c1;x<=best.c2;x++)
+        occupied.add(key(x,y));
+      if(best.c1!==best.c2||best.r1!==best.r2)result.push(best);
+    }
+  }
+  return result;
+}
 export function reconcileDay(xml,shared,events,styles,displayLines){
   const cells=readCellNodes(xml,shared);
   const mergeNodes=[...xml.matchAll(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*\/>/g)].map(m=>areaFromRef(m[1]));
@@ -213,7 +272,16 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
     for(const old of original)if(!alignment.has(old.address)){
       alignment.set(old.address,relocateOriginalCell(old.cell,old.address,styles.center(old.cell.style)));
     }
-    return {xml:setCell(xml,alignment),changes,warnings,placed:0};
+    const resultXml=setCell(xml,alignment);
+    // No new event does not mean no cleanup: an uploaded week's empty
+    // sections should still be merged without touching its staffing.
+    const finalMerges=mergeNodes.slice();
+    finalMerges.push(...mergeUnoccupiedSections(finalMerges,cells,alignment,styles));
+    const rebuilt=resultXml.replace(/<mergeCells\\b([^>]*)>[\\s\\S]*?<\\/mergeCells>/,block=>
+      block.replace(/\\bcount="\\d+"/,'count="'+finalMerges.length+'"')
+        .replace(/<mergeCell\\b[^>]*\\/>/g,"")
+        .replace("</mergeCells>",finalMerges.map(m=>'<mergeCell ref="'+ref(m)+'"/>').join("")+"</mergeCells>"));
+    return {xml:rebuilt,changes,warnings,placed:0};
   }
   const updates=new Map(),deleted=new Set(),newMerges=mergeNodes.slice();
   const removing=new Set([...planned].filter(p=>!p.inPlace).map(p=>p.old).filter(Boolean));
@@ -307,6 +375,9 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
     updates.set(old.address,relocateOriginalCell(old.cell,old.address,styles.center(old.cell.style)));
   }
   xml=setCell(xml,updates);
+  // Finish any remaining blank, unmerged bay areas. The original section
+  // dividers remain boundaries, and staff/event text is never swallowed.
+  newMerges.push(...mergeUnoccupiedSections(newMerges,cells,updates,styles));
   const unique=[...new Map(newMerges.map(m=>[ref(m),m])).values()];
   // Excel cannot safely display overlapping merged cells. Fail the preview
   // and export rather than silently corrupting the uploaded weekly floorplan.
