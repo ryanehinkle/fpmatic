@@ -32,9 +32,11 @@ assert.deepEqual(stack.map(x=>[x.row,x.height]),[[0,2],[2,2]],"Stacked 2-high ev
 assert.equal(plot.overflow.length,0);
 
 const original=fs.readFileSync(new URL("../master.xlsx",import.meta.url));
+globalThis.fetch=async()=>({ok:true,arrayBuffer:async()=>original.buffer.slice(original.byteOffset,original.byteOffset+original.byteLength)});
 const originalZip=await JSZip.loadAsync(original);
 const sourceModule=fs.readFileSync(new URL("../excel-export.js",import.meta.url),"utf8");
-const exporter=await import("data:text/javascript;base64,"+Buffer.from(sourceModule).toString("base64"));
+const syncSource=fs.readFileSync(new URL("../floorplan-sync.js",import.meta.url),"utf8").replace(/^export /gm,"");
+const exporter=await import("data:text/javascript;base64,"+Buffer.from(syncSource+"\n"+sourceModule.replace(/^import[^\n]*\n/,"")).toString("base64"));
 
 let downloadedBlob,downloadedName;
 const makeURL=URL.createObjectURL,freeURL=URL.revokeObjectURL;
@@ -46,7 +48,7 @@ globalThis.document={
 };
 try{
  await exporter.exportExactFloorPlan({
-   state:{master:new Uint8Array(original),week:monday},weekEvents:data,layoutDay,
+   state:{master:null,week:monday},weekEvents:data,layoutDay,
    period,displayLines:e=>[e.name,e.start+"-"+e.end,e.guests+"ppl",e.package],
    addDays:(date,n)=>{const d=new Date(date+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
  });
