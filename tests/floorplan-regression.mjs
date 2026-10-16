@@ -36,7 +36,7 @@ globalThis.fetch=async()=>({ok:true,arrayBuffer:async()=>original.buffer.slice(o
 const originalZip=await JSZip.loadAsync(original);
 const sourceModule=fs.readFileSync(new URL("../excel-export.js",import.meta.url),"utf8");
 const syncSource=fs.readFileSync(new URL("../floorplan-sync.js",import.meta.url),"utf8").replace(/^export /gm,"");
-const exporter=await import("data:text/javascript;base64,"+Buffer.from(syncSource+"\n"+sourceModule.replace(/^import[^\n]*\n/,"")).toString("base64"));
+const exporter=await import("data:text/javascript;base64,"+Buffer.from(syncSource+"\nasync function applyEventHyperlinks(){return 0;}\n"+sourceModule.replace(/^import[^\n]*\n/gm,"")).toString("base64"));
 
 let downloadedBlob,downloadedName;
 const makeURL=URL.createObjectURL,freeURL=URL.revokeObjectURL;
