@@ -208,6 +208,11 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
       const style=styles.staff?styles.staff(original.style):styles.center(original.style);
       alignment.set(block.address,relocateOriginalCell(original,block.address,style));
     }
+    // Existing event blocks keep their original formatting while receiving
+    // centered horizontal and vertical alignment.
+    for(const old of original)if(!alignment.has(old.address)){
+      alignment.set(old.address,relocateOriginalCell(old.cell,old.address,styles.center(old.cell.style)));
+    }
     return {xml:setCell(xml,alignment),changes,warnings,placed:0};
   }
   const updates=new Map(),deleted=new Set(),newMerges=mergeNodes.slice();
@@ -296,6 +301,10 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
     updates.set(address,/\bs="\d+"/.test(original)
       ?original.replace(/\bs="\d+"/,'s="'+align+'"')
       :original.replace(/<c\b/,'<c s="'+align+'"'));
+  }
+  for(const old of original){
+    if(updates.has(old.address))continue;
+    updates.set(old.address,relocateOriginalCell(old.cell,old.address,styles.center(old.cell.style)));
   }
   xml=setCell(xml,updates);
   const unique=[...new Map(newMerges.map(m=>[ref(m),m])).values()];
