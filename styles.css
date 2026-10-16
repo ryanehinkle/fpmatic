@@ -194,3 +194,5 @@ body.is-landing .intro{margin:clamp(40px,12vh,130px) auto 0}
 @keyframes fp-link-spin{to{transform:rotate(360deg)}}
 @keyframes fp-link-check{from{opacity:.5;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 @media(prefers-reduced-motion:reduce){.link-progress.link-processing::before{animation:none}.link-progress.link-finished{animation:none}}
+
+.link-clipboard-target{position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
