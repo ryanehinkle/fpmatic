@@ -46,7 +46,7 @@ const longEvent={name:"New Midday Booking",bays:"101-103",start:"12:00",end:"15:
 const shifted=reconcileDay(tall,["Aidan R DBL\nw/ Erick P","Violet B 12-8"],[longEvent],richStyles,display);
 assert.equal(shifted.placed,1,"Midday event should fit inside tall first-floor staff allocation");
 assert(merges(shifted.xml).includes("E39:L45"),"Remaining staffed merge must span the AM/PM divide");
-assert(merges(shifted.xml).includes("H36:L38"),"The adjacent upper staff section must remain merged");
+assert(merges(shifted.xml).includes("H36:L38"),"The adjacent upper staff section must remain merged: "+JSON.stringify(merges(shifted.xml)));
 assert(merges(shifted.xml).includes("M36:T45"),"Unaffected 12–8 section must stay ten rows tall");
 assert(cell(shifted.xml,"E39").includes('t="s"><v>0</v>'),"Moved staff label lost its original rich/shared-string reference");
 assert(cell(shifted.xml,"E39").includes('s="417"'),"Moved staff label did not retain its source style and bottom alignment");
