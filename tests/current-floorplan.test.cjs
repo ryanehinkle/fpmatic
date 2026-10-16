@@ -54,4 +54,16 @@ assert(cell(shifted.xml,"M36").includes('t="s"><v>1</v>'),"Unrelated mid-shift s
 const keepLong=reconcileDay(tall,["Aidan R DBL\nw/ Erick P","Violet B 12-8"],[],richStyles,display);
 assert(merges(keepLong.xml).includes("E36:L45")&&merges(keepLong.xml).includes("M36:T45"),"Unchanged tall staffing merges were modified");
 assert(cell(keepLong.xml,"E36").includes('t="s"><v>0</v>'),"Unchanged 12–8 staff text was rewritten");
+// When an inserted event splits a staffing section without covering its
+// top-left cell, staff still belongs in the broad lower section, not a
+// one/two-bay strip on the left (Izack example).
+const skinny='<worksheet><sheetData><row r="20"><c r="O20" s="22" t="inlineStr"><is><t>Izack P 930</t></is></c></row></sheetData>'+
+  '<mergeCells count="1"><mergeCell ref="O20:W24"/></mergeCells></worksheet>';
+const izackEvent={name:"Joey Birthday",bays:"213-217",start:"10:00",end:"12:00",guests:19,package:"Flex",category:"Flex",status:"Definite"};
+const relocated=reconcileDay(skinny,[],[izackEvent],richStyles,display);
+assert.equal(relocated.placed,1,JSON.stringify(relocated.warnings));
+assert(merges(relocated.xml).includes("O23:W24"),"Broad lower staff merge disappeared");
+assert(merges(relocated.xml).includes("O20:P22"),"Unoccupied side strip should remain");
+assert(cell(relocated.xml,"O23").includes("Izack P 930"),"Staff name should move to the bottom section");
+assert(!cell(relocated.xml,"O20").includes("Izack P 930"),"Staff name still stranded in the narrow strip");
 console.log("PASS: moved birthday expands Kelly, preserves Bryce, in-place updates retain staffing, custom 16-sheet workbook selects real weekdays");
