@@ -18,6 +18,12 @@ Use **Excel master** (top right) to select an existing Monday–Sunday floorplan
 
 Combined Signature North/South is labeled **Full Sig**, all tentative event lettering is black, and **Tom's Lessons** is intentionally ignored.
 
+### Updating an existing floorplan
+
+The optional **Current floorplan** XLSX field accepts an already-staffed, partially completed weekly workbook (even one with separate AM reference sheets). The CSV reports are authoritative for event bays, guest counts, times, rooms and food packages. FPmatic matches existing events by name and day, updates those events in place when possible, and moves them when bay assignments change. Unrelated staffing and filled event sections are preserved. When a moved event frees a stacked staffing block, the neighboring staff section can expand into the vacated rows. The on-screen floor board is rendered from the actual prepared workbook, with a **Changes** panel listing guest, bay, package, room and time differences for each weekday.
+
+The original uploaded workbook is never overwritten. Events without a safe available location are left unchanged and reported for review rather than overwriting other bookings or fully covering a staff assignment.
+
 ### Floor-plan rules
 
 - 102 bays: first floor 101–134, second 201–234, third 301–334.
