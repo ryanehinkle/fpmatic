@@ -73,10 +73,10 @@ const shortRepeated=api.linkForWorksheetText("BMO Bank\n4-7\nFajita",
 assert(shortRepeated&&shortRepeated.includes("/BMO/"),"Event repeated without guest line should still link");
 assert.equal(api.matchingSalesforceLink({name:"Sipley Elem School",date:"2026-10-14",
   start:"10:00",end:"12:00",bays:"226-234",guests:52},parsed),null,"Never match across event dates");
-const spreadsheetRepeated=api.addSheetHyperlinks(oldXml,null,[{ref:"E4",url:href},{ref:"F4",url:href}],n=>n+1000);
+const spreadsheetRepeated=api.addSheetHyperlinks(oldXml,null,[{ref:"E4",url:href},{ref:"F4",url:href}]);
 assert.equal(spreadsheetRepeated.added,2,"All appearances of an event must receive a hyperlink");
 assert(spreadsheetRepeated.xml.includes('<hyperlink ref="F4"'),"Repeated event appearance had no link");
-assert(spreadsheetRepeated.xml.includes('s="1022"'),"Hyperlinked event did not receive explicit visual-preservation font");
+assert(spreadsheetRepeated.xml.includes('s="22"'),"Adding a hyperlink altered the original style");
 const originalSheetWithExisting=result.xml.replace("</hyperlinks>",'<hyperlink ref="G9" r:id="rId999"/></hyperlinks>');
 const preserved=api.addSheetHyperlinks(originalSheetWithExisting,result.rels,[{ref:"E4",url:href}]);
 assert(preserved.xml.includes('ref="G9"'),"Unrelated hyperlink was removed");
