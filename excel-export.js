@@ -65,23 +65,6 @@ function recolorStyles(xml){
     ).replace("</fonts>",appended+"</fonts>");
   });
 
-  const existingFontSection=(xml.match(/<fonts\b[^>]*>[\s\S]*?<\/fonts>/)||[])[0]||"";
-  const fontTemplates=[...existingFontSection.matchAll(/<font\b[^>]*\/>|<font\b[^>]*>[\s\S]*?<\/font>/g)].map(x=>x[0]);
-  const hyperlinkFonts=[],hyperlinkFontCache=new Map(),hyperlinkStyleCache=new Map();
-  function hyperlinkFont(index){
-    if(hyperlinkFontCache.has(index))return hyperlinkFontCache.get(index);
-    let font=fontTemplates[index]||fontTemplates[0]||"<font></font>";
-    if(/<font\b[^>]*\/>/.test(font))font=font.replace(/\/>$/,"></font>");
-    // Force explicit original color/underline state. Google Sheets can apply
-    // its own blue-underlined default unless these are set on the cell font.
-    font=font.replace(/<u\b[^>]*(?:\/>|>[\s\S]*?<\/u>)/g,"")
-      .replace(/<\/font>/,'<u val="none"/></font>');
-    if(!/<color\b/.test(font))font=font.replace(/<\/font>/,'<color rgb="FF000000"/></font>');
-    const newId=fontTemplates.length+hyperlinkFonts.length;
-    hyperlinkFonts.push(font);
-    hyperlinkFontCache.set(index,newId);
-    return newId;
-  }
   const xfsMatch=xml.match(/<cellXfs\b[^>]*>[\s\S]*?<\/cellXfs>/);
   if(!xfsMatch)throw new Error("Invalid Excel master cell style table");
   const originals=[...xfsMatch[0].matchAll(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g)].map(x=>x[0]);
@@ -164,20 +147,6 @@ function recolorStyles(xml){
     return Math.max(...channels)<125;
   }
   const styleIds={
-    link(baseStyle){
-      if(hyperlinkStyleCache.has(baseStyle))return hyperlinkStyleCache.get(baseStyle);
-      const base=originals[baseStyle]||created[baseStyle-originals.length];
-      if(!base)return baseStyle;
-      const opening=base.match(/^<xf\b[^>]*\/?>/)[0];
-      const baseFont=Number((opening.match(/\bfontId="(\d+)"/)||[])[1]||0);
-      const fontId=hyperlinkFont(baseFont);
-      let next=setAttribute(opening,"fontId",fontId);
-      next=setAttribute(next,"applyFont",1);
-      const id=originals.length+created.length;
-      created.push(base.replace(opening,next));
-      hyperlinkStyleCache.set(baseStyle,id);
-      return id;
-    },
     hardDivider(leftId,rightId,direction){
       return direction==="vertical"?
         sectionBorderEdge(leftId,"right")||sectionBorderEdge(rightId,"left"):
@@ -212,13 +181,7 @@ function recolorStyles(xml){
   };
 
   function finalize(stylesXml){
-    if(!created.length&&!hyperlinkFonts.length)return stylesXml;
-    if(hyperlinkFonts.length){
-      stylesXml=replaceSection(stylesXml,"fonts",section=>
-        section.replace(/<fonts\b([^>]*)>/,(_,attrs)=>
-          '<fonts'+attrs.replace(/\bcount="\d+"/,'count="'+(fontTemplates.length+hyperlinkFonts.length)+'"')+'>'
-        ).replace("</fonts>",hyperlinkFonts.join("")+"</fonts>"));
-    }
+    if(!created.length)return stylesXml;
     stylesXml=replaceSection(stylesXml,"borders",section=>{
       if(!addedBorders.length)return section;
       return section.replace(/<borders\b([^>]*)>/,(_,attrs)=>
@@ -561,7 +524,7 @@ export async function buildExactFloorPlan({state,weekEvents,layoutDay,period,dis
   }
   // Add links to worksheet event anchors without changing a single cell
   // style, font, border, merge, color or visible text.
-  const hyperlinked=await applyEventHyperlinks(zip,modified,dayPaths,shared,weekEvents,state.salesforceLinks||[],state.week,addDays,styleIds.link);
+  const hyperlinked=await applyEventHyperlinks(zip,modified,dayPaths,shared,weekEvents,state.salesforceLinks||[],state.week,addDays);
   zip.file("xl/workbook.xml",renameWeeklyTabs(workbookXml,state.week,addDays));
   zip.file("xl/styles.xml",finalize(updatedStyles));
   for(const [path,xml] of modified)zip.file(path,xml);
