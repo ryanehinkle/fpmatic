@@ -307,15 +307,26 @@ function previewFloorBoard(floor){
   return '<section class="floor-board"><div class="floor-title">'+label+'</div><div class="floor-main"><div class="landmarks">'+renderLandmarks(floor)+'</div><div class="bay-headers">'+hdr+'</div>'+forPeriod("AM")+forPeriod("PM")+'<div class="bay-headers">'+hdr+'</div></div></section>';
 }
 let previewToken=0;
+let exportedPreviewCache=null;
+function workbookExportKey(){
+  // Includes every day of the selected week, not just the active tab.
+  return JSON.stringify([state.week,state.masterName,weeksEvents(),state.salesforceLinks]);
+}
 async function refreshWorkbookPreview(){
   if(!state.events.length){state.preview=null;state.changesByDay=[];return}
   const token=++previewToken;
+  exportedPreviewCache=null;
+  const buildKey=workbookExportKey(),buildMaster=state.master;
   state.preview=null;state.previewWarning="";
   $("daySubheading").textContent="Building Excel preview…";
   try{
     const output=await buildExactFloorPlan({state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays});
     const snapshot=await readWorkbookPreview(output.blob);
     if(token!==previewToken)return;
+    // The workbook already built for the Excel preview is the exact export;
+    // re-use its bytes rather than regenerating all seven worksheets.
+    if(buildMaster===state.master&&buildKey===workbookExportKey())
+      exportedPreviewCache={key:buildKey,master:buildMaster,output};
     state.preview=snapshot;
     state.changesByDay=output.changesByDay||[];
     state.previewWarning=output.skipped?.length?output.skipped.join("\n"):"";
@@ -481,9 +492,13 @@ async function exportWorkbook(){
   const originalText=button.textContent;
   button.textContent="Preparing Excel…";
   try{
+    const key=workbookExportKey();
+    const cachedResult=exportedPreviewCache&&exportedPreviewCache.key===key&&exportedPreviewCache.master===state.master
+      ?exportedPreviewCache.output:null;
     const exported=await exportExactFloorPlan({
-      state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays
+      state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays,cachedResult
     });
+    if(!cachedResult)exportedPreviewCache={key,master:state.master,output:exported};
     // Non-blocking export: conflicts remain available in Review and developer logs.
     // Never interrupt the user with a browser alert after a successful download.
     if(exported.skipped?.length)console.warn("FPmatic skipped placements:",exported.skipped);
