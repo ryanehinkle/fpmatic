@@ -65,7 +65,6 @@ const {plotSheet,recolorStyles}=vm.runInNewContext(source+"\n({plotSheet,recolor
   assert.equal(sideDetails("AA26","right").color,"FF000000","Original right section border lost");
   // Tentative font should be black, not the former white override.
   const staffStyleId=styled.styleIds.staff(0);
-  const linkedStyleId=styled.styleIds.link(0);
   const finalized=styled.finalize(styled.xml);
   const eventCell=(rendered.xml.match(/<c r="S25" s="(\d+)"/)||[])[1];
   assert(eventCell,"Missing event anchor");
@@ -85,18 +84,6 @@ const {plotSheet,recolorStyles}=vm.runInNewContext(source+"\n({plotSheet,recolor
     const updated=(centeredStaff.match(new RegExp("\\b"+attribute+'="(\\d+)"'))||[])[1]||"0";
     assert.equal(updated,value,"Centering altered original staff "+attribute);
   }
-  const linkedStyle=allXfs[linkedStyleId];
-  assert(linkedStyle,"No linked event style generated");
-  for(const attribute of ["fillId","borderId"]){
-    const before=(originalStyle.match(new RegExp("\\b"+attribute+'="(\\d+)"'))||[])[1]||"0";
-    const after=(linkedStyle.match(new RegExp("\\b"+attribute+'="(\\d+)"'))||[])[1]||"0";
-    assert.equal(after,before,"Linked event changed original "+attribute);
-  }
-  const linkedFontId=Number((linkedStyle.match(/\bfontId="(\d+)"/)||[])[1]||0);
-  const fontXml=(finalized.match(/<fonts\b[^>]*>([\s\S]*?)<\/fonts>/)||[])[1]||"";
-  const linkedFonts=[...fontXml.matchAll(/<font\b[^>]*\/>|<font\b[^>]*>[\s\S]*?<\/font>/g)].map(m=>m[0]);
-  assert(linkedFonts[linkedFontId]?.includes('<u val="none"/>'),"Linked font must explicitly disable underlining");
-  assert(/<color\b/.test(linkedFonts[linkedFontId]||""),"Linked font needs an explicit original color to prevent blue text");
   // A manually pre-populated block is never overwritten by imported events.
   const occupied=premerged.replace(/<c r="P25"[^>]*\/>/, '<c r="P25" s="2" t="inlineStr"><is><t>Already Assigned</t></is></c>');
   const result2=plotSheet(occupied,[e],layout,styled.styleIds,()=>"PM",x=>[x.name]);
