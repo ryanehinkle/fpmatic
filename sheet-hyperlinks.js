@@ -8,7 +8,7 @@ function unusedRid(existing,extra=[]){
   let n=1;while(ids.has("rId"+n))n++;
   return "rId"+n;
 }
-export function addSheetHyperlinks(xml,rels,items,linkStyle=null){
+export function addSheetHyperlinks(xml,rels,items){
   if(!items?.length)return {xml,rels,added:0};
   let relationshipXml=rels||'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="'+XML_REL+'"></Relationships>';
   if(!/<Relationships\b/.test(relationshipXml))throw new Error("Unsupported Excel worksheet relations");
@@ -30,23 +30,6 @@ export function addSheetHyperlinks(xml,rels,items,linkStyle=null){
     relationships.push('<Relationship Id="'+id+'" Type="'+XLSX_REL+'" Target="'+escapeXml(url)+'" TargetMode="External"/>');
   }
   if(!hyperlinkTags.length)return {xml,rels,added:0};
-  if(typeof linkStyle==="function"){
-    const linked=new Set(hyperlinkTags.map(tag=>(tag.match(/\bref="([^"]+)"/)||[])[1]).filter(Boolean));
-    // Reuse a visual clone of the original XF with the SAME face/size/color,
-    // but with explicit no-underline so Excel/Sheets won't turn links blue.
-    xml=xml.replace(/<c\b[^>]*\br="[A-Z]{1,3}\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,(tag)=>{
-      const ref=(tag.match(/\br="([^"]+)"/)||[])[1];
-      if(!linked.has(ref))return tag;
-      const oldStyle=Number((tag.match(/\bs="(\d+)"/)||[])[1]||0);
-      const style=linkStyle(oldStyle);
-      const opening=tag.match(/^<c\b[^>]*>/)?.[0]||tag.match(/^<c\b[^>]*\/>/)?.[0]||"";
-      if(!opening)return tag;
-      const styled=/\bs="\d+"/.test(opening)?
-        opening.replace(/\bs="\d+"/,'s="'+style+'"'):
-        opening.replace(/<c\b/,'<c s="'+style+'"');
-      return styled+tag.slice(opening.length);
-    });
-  }
   relationshipXml=relationshipXml.replace(/<Relationships\b([^>]*)\/>/,
     (_,attrs)=>'<Relationships'+attrs+'></Relationships>');
   relationshipXml=relationshipXml.replace("</Relationships>",relationships.join("")+"</Relationships>");
@@ -77,7 +60,7 @@ function anchoredBayRanges(xml){
   }
   return out;
 }
-export async function applyEventHyperlinks(zip,modified,dayPaths,shared,events,links,week,addDays,linkStyle=null){
+export async function applyEventHyperlinks(zip,modified,dayPaths,shared,events,links,week,addDays){
   let added=0;
   const targets=[];
   for(let day=0;day<7;day++)if(dayPaths[day])
@@ -112,7 +95,7 @@ export async function applyEventHyperlinks(zip,modified,dayPaths,shared,events,l
     if(!items.length)continue;
     const relationshipPath=path.replace("/worksheets/","/worksheets/_rels/")+".rels";
     const oldRels=zip.file(relationshipPath);
-    const result=addSheetHyperlinks(xml,oldRels?await oldRels.async("string"):null,items,linkStyle);
+    const result=addSheetHyperlinks(xml,oldRels?await oldRels.async("string"):null,items);
     modified.set(path,result.xml);
     zip.file(relationshipPath,result.rels);
     added+=result.added;
