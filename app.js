@@ -318,8 +318,11 @@ function buildWorkbookOnce(key=workbookExportKey()){
     return Promise.resolve(exportedPreviewCache.output);
   if(pendingWorkbookBuild?.key===key&&pendingWorkbookBuild.master===master)
     return pendingWorkbookBuild.promise;
+  // Snapshot the selected week/master before any asynchronous ZIP work.
+  // Switching days or weeks while a build runs must not mix two weeks.
+  const snapshot={...state,salesforceLinks:[...state.salesforceLinks]};
   const build={key,master,promise:buildExactFloorPlan({
-    state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays
+    state:snapshot,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays
   })};
   pendingWorkbookBuild=build;
   build.promise.then(output=>{
