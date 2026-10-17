@@ -89,7 +89,7 @@ export async function readWorkbookPreview(blob){
   const days=[];
   for(let day=0;day<7;day++){
     const path=paths[day];if(!path)throw new Error("Missing day "+day+" in workbook");
-    const xml=await zip.file(path).async("string"),cells=parseFloorplanCell(xml,shared);
+    const xml=await zip.file(path).async("string"),cells=parseFloorplanCell(xml,shared,true);
     const covered=new Set(),regions=[];
     const merges=[...xml.matchAll(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*\/>/g)].map(x=>fromRef(x[1])).filter(Boolean);
     for(const area of merges){
