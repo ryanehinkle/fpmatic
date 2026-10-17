@@ -16,11 +16,18 @@ function normalized(s){return String(s||"").normalize("NFKD").replace(/[\u0300-\
 function decode(s){return String(s||"").replace(/&(?:amp|lt|gt|quot|apos|#(\d+)|#x([a-f0-9]+));/gi,(m,dec,hex)=>dec?String.fromCharCode(+dec):hex?String.fromCharCode(parseInt(hex,16)):({"&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"',"&apos;":"'"}[m]||m))}
 function encode(s){return String(s??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[ch]))}
 function readShared(xml){return [...String(xml||"").matchAll(/<si(?:\s[^>]*)?>[\s\S]*?<\/si>/g)].map(m=>decode([...m[0].matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map(t=>t[1]).join("")))}
-function readCellNodes(xml,shared){
+function readCellNodes(xml,shared,plotOnly=false){
   const result=new Map();
   const re=/<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*\/>|<c\b(?=[^>]*\br="([A-Z]{1,3}\d+)")[^>]*>[\s\S]*?<\/c>/g;
   for(const m of xml.matchAll(re)){
-    const address=m[1]||m[2],tag=m[0],type=(tag.match(/\bt="([^"]+)"/)||[])[1]||"",s=+(tag.match(/\bs="(\d+)"/)||[])[1]||0;
+    const address=m[1]||m[2];
+    if(plotOnly){
+      const parts=address.match(/^([A-Z]{1,3})(\d+)$/);
+      const row=Number(parts?.[2]),letters=parts?.[1]||"";
+      let column=0;for(let i=0;i<letters.length;i++)column=column*26+letters.charCodeAt(i)-64;
+      if(column<5||column>38||row<4||row>45)continue;
+    }
+    const tag=m[0],type=(tag.match(/\bt="([^"]+)"/)||[])[1]||"",s=+(tag.match(/\bs="(\d+)"/)||[])[1]||0;
     const v=(tag.match(/<v>([\s\S]*?)<\/v>/)||[])[1]||"";
     const rich=[...tag.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join("");
     const text=type==="s"?(shared[+v]||""):type==="inlineStr"?decode(rich):type==="str"?decode(v):"";
@@ -218,7 +225,7 @@ function mergeUnoccupiedSections(existing,sourceCells,updatedCells,styles){
   return result;
 }
 export function reconcileDay(xml,shared,events,styles,displayLines){
-  const cells=readCellNodes(xml,shared);
+  const cells=readCellNodes(xml,shared,true);
   const mergeNodes=[...xml.matchAll(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*\/>/g)].map(m=>areaFromRef(m[1]));
   const original=[];
   for(const m of mergeNodes){
@@ -422,7 +429,7 @@ export function workbookDayPaths(workbookXml){
   return out;
 }
 export function getLiveEvents(xml,shared){
-  const cells=readCellNodes(xml,shared);
+  const cells=readCellNodes(xml,shared,true);
   const merged=(xml.match(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*\/>/g)||[]).map(x=>areaFromRef((x.match(/\bref="([^"]+)"/)||[])[1]));
   const result=[];
   for(const area of merged){
