@@ -188,11 +188,18 @@ function mergeUnoccupiedSections(existing,sourceCells,updatedCells,styles){
     const p=loc(address);if(p&&p.c>=5&&p.c<=38)occupied.add(key(p.c,p.r));
   }
   const free=(c,r)=>!occupied.has(key(c,r));
+  // A master can have 75,000+ cells per tab. The rectangle search asks
+  // about each original boundary many times; style parsing must happen once.
+  const edgeCache=new Map();
   const hard=(c1,r1,c2,r2,side)=>{
     if(typeof styles.hardDivider!=="function")return false;
+    const key=c1+":"+r1+":"+c2+":"+r2+":"+side;
+    if(edgeCache.has(key))return edgeCache.get(key);
     const a=sourceCells.get(col(c1)+r1)?.style??0;
     const b=sourceCells.get(col(c2)+r2)?.style??0;
-    return styles.hardDivider(a,b,side);
+    const result=styles.hardDivider(a,b,side);
+    edgeCache.set(key,result);
+    return result;
   };
   const result=[];
   for(const [top,bottom] of EVENT_ROWS){
