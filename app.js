@@ -307,10 +307,31 @@ function previewFloorBoard(floor){
   return '<section class="floor-board"><div class="floor-title">'+label+'</div><div class="floor-main"><div class="landmarks">'+renderLandmarks(floor)+'</div><div class="bay-headers">'+hdr+'</div>'+forPeriod("AM")+forPeriod("PM")+'<div class="bay-headers">'+hdr+'</div></div></section>';
 }
 let previewToken=0;
-let exportedPreviewCache=null;
+let exportedPreviewCache=null,pendingWorkbookBuild=null;
 function workbookExportKey(){
   // Includes every day of the selected week, not just the active tab.
   return JSON.stringify([state.week,state.masterName,weeksEvents(),state.salesforceLinks]);
+}
+function buildWorkbookOnce(key=workbookExportKey()){
+  const master=state.master;
+  if(exportedPreviewCache?.key===key&&exportedPreviewCache.master===master)
+    return Promise.resolve(exportedPreviewCache.output);
+  if(pendingWorkbookBuild?.key===key&&pendingWorkbookBuild.master===master)
+    return pendingWorkbookBuild.promise;
+  const build={key,master,promise:buildExactFloorPlan({
+    state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays
+  })};
+  pendingWorkbookBuild=build;
+  build.promise.then(output=>{
+    if(pendingWorkbookBuild===build){
+      if(key===workbookExportKey()&&master===state.master)
+        exportedPreviewCache={key,master,output};
+      pendingWorkbookBuild=null;
+    }
+  },()=>{
+    if(pendingWorkbookBuild===build)pendingWorkbookBuild=null;
+  });
+  return build.promise;
 }
 async function refreshWorkbookPreview(){
   if(!state.events.length){state.preview=null;state.changesByDay=[];return}
@@ -320,7 +341,7 @@ async function refreshWorkbookPreview(){
   state.preview=null;state.previewWarning="";
   $("daySubheading").textContent="Building Excel preview…";
   try{
-    const output=await buildExactFloorPlan({state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays});
+    const output=await buildWorkbookOnce(buildKey);
     const snapshot=await readWorkbookPreview(output.blob);
     if(token!==previewToken)return;
     // The workbook already built for the Excel preview is the exact export;
@@ -493,12 +514,11 @@ async function exportWorkbook(){
   button.textContent="Preparing Excel…";
   try{
     const key=workbookExportKey();
-    const cachedResult=exportedPreviewCache&&exportedPreviewCache.key===key&&exportedPreviewCache.master===state.master
-      ?exportedPreviewCache.output:null;
+    // Never build the same seven-day workbook twice in parallel.
+    const cachedResult=await buildWorkbookOnce(key);
     const exported=await exportExactFloorPlan({
       state,weekEvents:weeksEvents(),layoutDay,period,displayLines,addDays,cachedResult
     });
-    if(!cachedResult)exportedPreviewCache={key,master:state.master,output:exported};
     // Non-blocking export: conflicts remain available in Review and developer logs.
     // Never interrupt the user with a browser alert after a successful download.
     if(exported.skipped?.length)console.warn("FPmatic skipped placements:",exported.skipped);
