@@ -1,7 +1,7 @@
 const fs=require("node:fs"),vm=require("node:vm"),assert=require("node:assert/strict"),path=require("node:path");
 const base=p=>fs.readFileSync(path.join(__dirname,"..",p),"utf8").replace(/^import[^\n]*\n/gm,"").replace(/^export /gm,"");
 const all=base("floorplan-sync.js")+"\n"+base("salesforce-links.js")+"\n"+base("sheet-hyperlinks.js");
-const api=vm.runInNewContext(all+"\n({extractSalesforceLinks,matchingSalesforceLink,linkForWorksheetText,addSheetHyperlinks,applyEventHyperlinks})",{URL,Map,Set,console});
+const api=vm.runInNewContext(all+"\n({extractSalesforceLinks,matchingSalesforceLink,linkForWorksheetText,addSheetHyperlinks,applyEventHyperlinks,parseFloorplanCell})",{URL,Map,Set,console});
 const id="006xx00000123ABCDE";
 const href="https://topgolf.lightning.force.com/lightning/r/Opportunity/"+id+"/view?tab=Details&from=report";
 const label="Stephen's Surprise Birthday Party - Jane Smith - 10.16.26";
@@ -107,5 +107,43 @@ const JSZip=require("../jszip.min.js");
  const updated=touched.get("xl/worksheets/sheet88.xml");
  assert(updated.includes('ref="K5"'),"Repeated BMO opportunity missing from AM worksheet");
  assert(updated.includes('s="17"'),"Extra worksheet event formatting changed unexpectedly");
+ // Regression: the real source can contain ~76,000 cells per worksheet,
+ // but only the E:AL floor-plan grid matters. Link EVERY day (Mon–Sun),
+ // including days later than the current calendar date.
+ const largeZip=new JSZip(),dayPaths={};const largeMap=new Map(),weeklyLinks=[];
+ const dayNames=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+ const largeWorkbook=['<?xml version="1.0"?><workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'];
+ const junk=Array.from({length:60000},(_,i)=>{
+   let n=i+1,letters="";while(n){n--;letters=String.fromCharCode(65+n%26)+letters;n=Math.floor(n/26)}
+   return '<c r="'+letters+'80" s="1"/>';
+ }).join("");
+ for(let d=0;d<7;d++){
+   const date="2026-10-"+String(12+d),name="Later Event "+d;
+   const ref="xl/worksheets/sheet"+(d+1)+".xml";dayPaths[d]=ref;
+   const xml='<worksheet><sheetData><row r="4"><c r="E4" s="18" t="inlineStr"><is><t>'+
+     name+'&#10;4-6&#10;20ppl&#10;Flex</t></is></c></row><row r="80">'+junk+'</row></sheetData>'+
+     '<mergeCells count="1"><mergeCell ref="E4:G6"/></mergeCells></worksheet>';
+   largeMap.set(ref,xml);
+   largeZip.file(ref,xml);
+   largeWorkbook.push('<sheet name="'+dayNames[d]+'" sheetId="'+(d+1)+'" r:id="rId'+(d+1)+'"/>');
+   weeklyLinks.push({name:name+' - Contact - 10.'+String(12+d)+'.26',shortName:name,
+     date,url:"https://topgolf.lightning.force.com/lightning/r/Opportunity/DAY"+d+"/view",
+     start:"4:00 PM",end:"6:00 PM",bays:"301-303",guests:20});
+ }
+ largeWorkbook.push("</sheets></workbook>");
+ largeZip.file("xl/workbook.xml",largeWorkbook.join(""));
+ const t0=Date.now();
+ const allDays=await api.applyEventHyperlinks(largeZip,largeMap,dayPaths,[],
+   [],weeklyLinks,"2026-10-12",(week,d)=>"2026-10-"+String(12+d));
+ const duration=Date.now()-t0;
+ assert.equal(allDays,7,"Every Monday–Sunday event should receive a link, even after the current day");
+ for(let d=0;d<7;d++){
+   const result=largeMap.get(dayPaths[d]);
+   assert(result.includes('<hyperlink ref="E4"'),"Unlinked "+dayNames[d]);
+   assert(result.includes('s="18"'),"Formatting changed on "+dayNames[d]);
+   assert(result.includes(junk.slice(0,80)),"Non-event worksheet content mutated");
+ }
+ assert(duration<30000,"Scanning unused Excel cells took "+duration+" ms");
+ console.log("PASS: 7-day complete hyperlink coverage across 420k non-event cells in "+duration+" ms");
  console.log("PASS: pasted Salesforce HTML, full Opportunity Name matching, safe URLs, invisible Excel hyperlinks, and unaffected formatting");
 })().catch(e=>{console.error(e);process.exitCode=1});
