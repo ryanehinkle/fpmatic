@@ -83,4 +83,21 @@ const labeled=emptyGrid.replace('<c r="F4" s="1"/>','<c r="F4" s="1" t="inlineSt
 const untouched=reconcileDay(labeled,[],[],styles,display);
 assert(cell(untouched.xml,"F4").includes("Staff One"),"Blank-area merging removed an employee label");
 assert(!merges(untouched.xml).some(m=>/^[A-Z]+\d+:[A-Z]+\d+$/.test(m)&&(()=>{const [a,b]=m.split(":");return a==="E4"&&b==="G8"})()),"Blank merge covered an employee");
+
+// Real uploaded weekly masters have about 76,000 styled cells per day, most
+// outside the floorplan. Reconciliation must not process them as event cells.
+const colRef=n=>{let x=n,out="";while(x){x--;out=String.fromCharCode(65+x%26)+out;x=Math.floor(x/26)}return out};
+const denseRows=Array.from({length:8},(_,i)=>{
+  const row=100+i;
+  return '<row r="'+row+'">'+Array.from({length:10000},(_,c)=>
+    '<c r="'+colRef(c+1)+row+'" s="1"/>').join("")+'</row>';
+}).join("");
+const denseXml='<worksheet><sheetData><row r="4"><c r="E4" s="1"/></row>'+denseRows+
+  '</sheetData><mergeCells count="0"></mergeCells></worksheet>';
+const benchmarkStart=Date.now();
+const denseResult=reconcileDay(denseXml,[],[],styles,display);
+const benchmarkTime=Date.now()-benchmarkStart;
+assert(denseResult.xml.includes('<row r="107">'),"Unrelated worksheet data got removed");
+assert(benchmarkTime<30000,"Dense 80,000-cell source took "+benchmarkTime+" ms");
+console.log("PASS: 80k-cell floorplan reconciliation in "+benchmarkTime+" ms");
 console.log("PASS: moved birthday expands Kelly, preserves Bryce, in-place updates retain staffing, custom 16-sheet workbook selects real weekdays");
