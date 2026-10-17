@@ -100,7 +100,7 @@ export async function applyEventHyperlinks(zip,modified,dayPaths,shared,events,l
   for(const {day,path,auxiliary} of targets){
     const xml=modified.get(path)||(await zip.file(path).async("string"));
     if(!xml)continue;
-    const date=addDays(week,day),cells=parseFloorplanCell(xml,shared),items=[],baysByAnchor=anchoredBayRanges(xml);
+    const date=addDays(week,day),cells=parseFloorplanCell(xml,shared,true),items=[],baysByAnchor=anchoredBayRanges(xml);
     for(const [ref,cell] of cells){
       if(!cell.text||!/^[A-Z]{1,3}\d+$/.test(ref))continue;
       const numeric=(ref.match(/\d+/)||[])[0],row=Number(numeric);
