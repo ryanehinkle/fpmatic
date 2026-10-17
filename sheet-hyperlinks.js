@@ -1,5 +1,5 @@
-import {parseFloorplanCell} from "./floorplan-sync.js?v=20261016g";
-import {linkForWorksheetText} from "./salesforce-links.js?v=20261016h";
+import {parseFloorplanCell} from "./floorplan-sync.js?v=20261017a";
+import {linkForWorksheetText} from "./salesforce-links.js?v=20261017a";
 const XLSX_REL="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
 const XML_REL="http://schemas.openxmlformats.org/package/2006/relationships";
 function escapeXml(s){return String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[ch]))}
