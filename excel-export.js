@@ -527,7 +527,7 @@ export async function buildExactFloorPlan({state,weekEvents,layoutDay,period,dis
     if(!response.ok)throw new Error("Original floor plan master could not be loaded");
     return await response.arrayBuffer();
   })());
-  const zip=await JSZip.loadAsync(masterBytes,{checkCRC32:true});
+  const zip=await JSZip.loadAsync(masterBytes);
   const styleFile=zip.file("xl/styles.xml");
   if(!styleFile)throw new Error("Original master has no Excel formatting table");
   const {xml:updatedStyles,styleIds,finalize}=recolorStyles(await styleFile.async("string"));
@@ -570,7 +570,7 @@ export async function buildExactFloorPlan({state,weekEvents,layoutDay,period,dis
   return {blob:result,filename,events:count,skipped,changesByDay,hyperlinked};
 }
 export async function exportExactFloorPlan(options){
-  const result=await buildExactFloorPlan(options);
+  const result=options.cachedResult||await buildExactFloorPlan(options);
   await downloadBinary(result.blob,result.filename);
   return result;
 }
