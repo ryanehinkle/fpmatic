@@ -84,7 +84,7 @@ function pickRow(e,range,staffAreas,protectedEvents,reserved,preferred){
      !reserved.some(x=>hit(x,preferred))){
     return {...preferred};
   }
-  const count=3; // Standard 3-high layout for genuinely new/moved bookings.
+  const count=preferred?.r2-preferred?.r1+1===2?2:3; // Keep existing 2-high stack handling; never invent a 4/5-high block.
   const candidates=[];
   // An old position is only a hint for newly laid-out cells, not license to
   // retain its old size after a bay/period change.
