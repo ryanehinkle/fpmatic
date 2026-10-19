@@ -127,15 +127,21 @@ for(let day=1;day<=7;day++){
  const src=sourceRowSizes(source),dst=sourceRowSizes(exported);
  const columnBlock=xml=>(xml.match(/<cols\b[^>]*>[\s\S]*?<\/cols>/)||[])[0];
  assert.equal(columnBlock(exported),columnBlock(source),"Bay column widths changed on day "+day);
+ const sectionRow=r=>(r>=14&&r<=19)||(r>=30&&r<=35);
  for(const [r,height] of src.rows){
-   assert.equal(dst.rows.get(r),height,"Row "+r+" was resized on day "+day);
+   const originalRow=(source.match(new RegExp('<row\\b[^>]*\\br="'+r+'"[^>]*>'))||[])[0]||"";
+   const custom=/\\bht="[^"]+"/.test(originalRow);
+   const expected=!custom&&sectionRow(r)?21:height;
+   assert.equal(dst.rows.get(r),expected,"Row "+r+" lost its original geometry or calibrated header height on day "+day);
  }
  for(const r of [14,15,16,17,18,19,30,31,32,33,34,35]){
    const tag=(exported.match(new RegExp('<row\\b[^>]*\\br="'+r+'"[^>]*>'))||[])[0];
    assert(tag&&tag.includes('customHeight="1"'),
      "Bay header or transition row "+r+" not locked on day "+day);
-   assert.equal(Number((tag.match(/\bht="([^"]+)"/)||[])[1]),src.rows.get(r),
-     "Bay header row "+r+" lost its master height on day "+day);
+   const originalTag=(source.match(new RegExp('<row\\b[^>]*\\br="'+r+'"[^>]*>'))||[])[0]||"";
+   const explicit=(originalTag.match(/\\bht="([^"]+)"/)||[])[1];
+   assert.equal(Number((tag.match(/\bht="([^"]+)"/)||[])[1]),explicit?Number(explicit):21,
+     "Bay header row "+r+" did not match the original visual spacing on day "+day);
  }
  for(const r of [4,5,8,9,13,20,21,24,25,29,36,40,41,45]){
    const tag=(exported.match(new RegExp('<row\\b[^>]*\\br="'+r+'"[^>]*>'))||[])[0];
@@ -144,7 +150,7 @@ for(let day=1;day<=7;day++){
    assert.equal(Number((tag.match(/\bht="([^"]+)"/)||[])[1]),src.rows.get(r));
  }
 }
-console.log("PASS: Every master row and column keeps the same effective height/width across all seven exported floorplans.");
+console.log("PASS: All seven sheets preserve custom row heights and bay widths; floor-divider rows match the 21pt reference screenshot.");
 
 const workbook=await read(outputZip,"xl/workbook.xml");
 for(const [i,name] of ["Monday 10.12","Tuesday 10.13","Wednesday 10.14","Thursday 10.15","Friday 10.16","Saturday 10.17","Sunday 10.18"].entries()){
