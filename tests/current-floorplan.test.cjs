@@ -34,6 +34,39 @@ assert(cell(y.xml,"O25").includes("40ppl"),"In-place guest update failed");
 assert(cell(y.xml,"O28").includes("Kelly"),"In-place update modified Kelly");
 assert.equal(workbookDayPaths('<sheets><sheet name="Monday 10.12" sheetId="1"/><sheet name="AM Monday 10.12" sheetId="2"/><sheet name="Tuesday 10.13" sheetId="3"/><sheet name="Tuesday 10.13 AM" sheetId="4"/><sheet name="Wednesday 10.14" sheetId="5"/><sheet name="Thursday 10.15" sheetId="7"/><sheet name="Friday 10.16" sheetId="9"/><sheet name="Saturday 10.17" sheetId="11"/><sheet name="Sunday 10.18" sheetId="12"/></sheets>')[4],"xl/worksheets/sheet9.xml");
 
+// Oversized custom event blocks in an uploaded floorplan are deliberate.
+// Preserve them ONLY while their bays and AM/PM section remain unchanged;
+// new/moved events still use the regular 3-row layout.
+const pentairMaster='<worksheet><sheetData><row r="25"><c r="E25" s="19" t="inlineStr"><is><t>'+
+  'Pentair&#10;Sig N 6-9&#10;40ppl&#10;Smokehouse&#10;EAO- Eduardo C</t></is></c></row>'+
+  '</sheetData><mergeCells count="1"><mergeCell ref="E25:G29"/></mergeCells></worksheet>';
+const pentair={name:"Pentair",bays:"201-203",start:"18:00",end:"21:00",
+  guests:45,package:"Smokehouse",category:"Buffet",status:"Definite"};
+const retained=reconcileDay(pentairMaster,[],[pentair],styles,display);
+assert.equal(retained.placed,1,"Existing custom-height booking should be plotted");
+assert(merges(retained.xml).includes("E25:G29"),"Original five-row Pentair event was incorrectly shrunk");
+assert(!merges(retained.xml).includes("E25:G27"),"Existing oversized event was replaced by default 3 rows");
+assert(cell(retained.xml,"E25").includes("45ppl"),"Existing full-height event details were not updated");
+assert(cell(retained.xml,"E25").includes("Eduardo C"),"Existing event note was lost");
+const movedTall=reconcileDay(pentairMaster,[],[{...pentair,bays:"204-206"}],styles,display);
+assert(merges(movedTall.xml).includes("H25:J27"),"Moved event incorrectly retained 5-row custom height");
+assert(!merges(movedTall.xml).includes("H25:J29"),"Custom height should not follow a bay move");
+const changedShift=reconcileDay(pentairMaster,[],[{...pentair,start:"12:00",end:"15:00"}],styles,display);
+assert(merges(changedShift.xml).includes("E20:G22"),"AM shift change should create standard 3-high event");
+assert(merges(changedShift.xml).includes("E25:G29"),"Vacated PM event space was not preserved as a blank section");
+const newStandard=reconcileDay('<worksheet><sheetData><row r="25"><c r="E25" s="2"/></row></sheetData><mergeCells count="0"></mergeCells></worksheet>',
+  [],[pentair],styles,display);
+assert(merges(newStandard.xml).includes("E25:G27"),"A new event should remain standard 3 rows");
+assert(!merges(newStandard.xml).includes("E25:G29"),"Never invent 5-row event blocks");
+const stellantisMaster=pentairMaster.replace(/Pentair/g,"Stellantis").replace(/E25:G29/g,"E25:G28");
+const stellantis=reconcileDay(stellantisMaster,[],[{...pentair,name:"Stellantis"}],styles,display);
+assert(merges(stellantis.xml).includes("E25:G28"),"Original four-row booking must retain its shape");
+const stackedMaster=pentairMaster.replace(/E25:G29/g,"E25:G26");
+const stacked=reconcileDay(stackedMaster,[],[pentair],styles,display);
+assert(merges(stacked.xml).includes("E25:G26"),"Existing two-row stacked booking must stay two rows");
+const stackedMoved=reconcileDay(stackedMaster,[],[{...pentair,bays:"204-206"}],styles,display);
+assert(merges(stackedMoved.xml).includes("H25:J26"),"Two-row stacked booking moved bays should retain two-high handling");
+
 // Mid-shift employee sections span all ten AM/PM rows. They must remain
 // continuous until an event actually needs the space, then split without
 // losing the original staff shared string or font assignment.
