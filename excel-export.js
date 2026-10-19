@@ -461,6 +461,42 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
   return {xml,count:placements.length,skipped};
 }
 
+/**
+ * Lock the master workbook's visual row geometry.
+ *
+ * Excel's custom/default row size definitions can be silently auto-fitted by
+ * Google Sheets on import, especially thin bay-number/landmark separator rows
+ * neighboring tall wrapped event cells. Every row is given the SAME effective
+ * height it had in the uploaded master, explicitly marked customHeight=1.
+ * This does not change any values, cell styles, merge boundaries, column
+ * widths, hidden flags, print settings or manually specified row heights.
+ */
+function lockMasterRowHeights(outputXml,masterXml){
+  const defaults=(masterXml.match(/<sheetFormatPr\b[^>]*\/?>/)||[])[0]||"";
+  const match=defaults.match(/\bdefaultRowHeight="([0-9]+(?:\.[0-9]+)?)"/);
+  if(!match)return outputXml; // Don't guess a height absent from this master.
+  const defaultHeight=match[1];
+  const masterRows=new Map(
+    [...masterXml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>/g)].map(m=>[m[1],m[0]])
+  );
+  const fixedRowTag=(tag)=>{
+    let row=tag;
+    const height=(row.match(/\bht="([0-9]+(?:\.[0-9]+)?)"/)||[])[1]||defaultHeight;
+    if(!/\bht="[^"]*"/.test(row))row=row.replace(/>$/,' ht="'+height+'">');
+    if(/\bcustomHeight="[^"]*"/.test(row))
+      row=row.replace(/\bcustomHeight="[^"]*"/,'customHeight="1"');
+    else row=row.replace(/>$/,' customHeight="1">');
+    return row;
+  };
+  outputXml=outputXml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>/g,(row,n)=>
+    fixedRowTag(masterRows.get(n)||row));
+  // The exporter must never change column geometry. Defensive restoration
+  // makes custom-uploaded masters authoritative if another stage did so.
+  const masterCols=(masterXml.match(/<cols\b[^>]*>[\s\S]*?<\/cols>/)||[])[0];
+  if(masterCols)outputXml=outputXml.replace(/<cols\b[^>]*>[\s\S]*?<\/cols>/,masterCols);
+  return outputXml;
+}
+
 function renameWeeklyTabs(xml,weekStart,addDays){
   // Change names only, never worksheet identities or ordering.
   return xml.replace(/<sheet\b[^>]*\/>/g,(tag)=>{
@@ -508,15 +544,16 @@ export async function buildExactFloorPlan({state,weekEvents,layoutDay,period,dis
     const original=zip.file(path);
     if(!original)throw new Error("Could not find "+DAYS[day]+" worksheet data");
     const events=weekEvents.filter(e=>e.date===addDays(state.week,day));
+    const masterSheetXml=await original.async("string");
     if(state.master){
-      const result=reconcileDay(await original.async("string"),shared,events,styleIds,displayLines);
-      modified.set(path,result.xml);
+      const result=reconcileDay(masterSheetXml,shared,events,styleIds,displayLines);
+      modified.set(path,lockMasterRowHeights(result.xml,masterSheetXml));
       count+=result.placed;
       changesByDay[day]=result.changes;
       skipped.push(...result.warnings.map(w=>DAYS[day]+": "+w));
     }else{
-      const result=plotSheet(await original.async("string"),events,layoutDay(events),styleIds,period,displayLines);
-      modified.set(path,result.xml);
+      const result=plotSheet(masterSheetXml,events,layoutDay(events),styleIds,period,displayLines);
+      modified.set(path,lockMasterRowHeights(result.xml,masterSheetXml));
       count+=result.count;
       changesByDay[day]=[];
       skipped.push(...result.skipped.map(w=>DAYS[day]+": "+w));
