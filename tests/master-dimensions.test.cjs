@@ -24,7 +24,7 @@ const output=master
 const fixed=lockMasterRowHeights(output,master);
 const tag=n=>(fixed.match(new RegExp('<row\\b[^>]*\\br="'+n+'"[^>]*>'))||[])[0]||"";
 const height=n=>Number((tag(n).match(/\bht="([^"]+)"/)||[])[1]);
-for(const [n,expected] of [[14,13.25],[19,16.5],[20,52.5],[30,13.25],[31,13.25],[32,11.75],[34,13.25]]){
+for(const [n,expected] of [[14,21],[19,16.5],[20,52.5],[30,21],[31,21],[32,11.75],[34,21]]){
  assert.equal(height(n),expected,"Original master row "+n+" changed size");
  assert(tag(n).includes('customHeight="1"'),"Row "+n+" still subject to auto-sizing");
 }
@@ -35,4 +35,4 @@ assert(fixed.includes('<col min="5" max="38" width="10.14" customWidth="1"/>'),
 assert(fixed.includes('<c r="E20" s="35"/>'),"Cell style was altered");
 assert(fixed.includes('<mergeCells count="0"></mergeCells>'),"Existing merges changed");
 assert.equal(lockMasterRowHeights(fixed,master),fixed,"Dimension locking should be idempotent");
-console.log("PASS: original custom/default row heights, hidden row flags, columns, cells and merges preserved");
+console.log("PASS: 21pt floor-transition headers and original custom row heights, hidden flags, columns, cells and merges preserved");
