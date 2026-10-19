@@ -1,6 +1,6 @@
-import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=20261019b";
-import {readWorkbookPreview} from "./floorplan-preview.js?v=20261017a";
-import {workbookDayPaths} from "./floorplan-sync.js?v=20261017a";
+import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=20261019c";
+import {readWorkbookPreview} from "./floorplan-preview.js?v=20261019c";
+import {workbookDayPaths} from "./floorplan-sync.js?v=20261019c";
 import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261013b";
 import {extractSalesforceLinks,canonicalOpportunity,matchingSalesforceLink,linkForWorksheetText,safeSalesforceUrl} from "./salesforce-links.js?v=20261017a";
 let pdfjsLib=null;
