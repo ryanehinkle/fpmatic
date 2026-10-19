@@ -464,12 +464,13 @@ function plotSheet(xml,events,layout,styleIds,period,displayLines){
 /**
  * Lock the master workbook's visual row geometry.
  *
- * Excel's custom/default row size definitions can be silently auto-fitted by
- * Google Sheets on import, especially thin bay-number/landmark separator rows
- * neighboring tall wrapped event cells. Every row is given the SAME effective
- * height it had in the uploaded master, explicitly marked customHeight=1.
- * This does not change any values, cell styles, merge boundaries, column
- * widths, hidden flags, print settings or manually specified row heights.
+ * Google Sheets' XLSX export often writes the user's visibly taller
+ * floor-divider/header rows as implicit 15 pt defaults. Importing that XLSX
+ * again collapses the 6-row bay-header bands (14–19, 30–35).
+ * Match the photographed 21 pt original appearance for those header rows
+ * while honoring any custom source row heights. Other rows retain the
+ * original effective height. Cells, colors, merges, column widths and
+ * explicitly sized rows are never resized.
  */
 function lockMasterRowHeights(outputXml,masterXml){
   const defaults=(masterXml.match(/<sheetFormatPr\b[^>]*\/?>/)||[])[0]||"";
