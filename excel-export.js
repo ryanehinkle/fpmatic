@@ -479,9 +479,18 @@ function lockMasterRowHeights(outputXml,masterXml){
   const masterRows=new Map(
     [...masterXml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>/g)].map(m=>[m[1],m[0]])
   );
-  const fixedRowTag=(tag)=>{
+  // Excel templates exported from Google Sheets commonly serialize the
+  // six-row floor-transition/header bands as bare 15 pt defaults, even when
+  // the original Google Sheets floorplan visually uses ~21 pt rows. The
+  // screenshots show this exact 6*4 px shortfall after reimport at 50% zoom.
+  // Restore the source floorplan's visible section spacing only when a row
+  // had NO explicit height. Respect all explicitly sized uploaded masters.
+  const isSectionBand=(n)=>(n>=14&&n<=19)||(n>=30&&n<=35);
+  const sectionHeight="21";
+  const fixedRowTag=(tag,n)=>{
     let row=tag;
-    const height=(row.match(/\bht="([0-9]+(?:\.[0-9]+)?)"/)||[])[1]||defaultHeight;
+    const explicit=(row.match(/\bht="([0-9]+(?:\.[0-9]+)?)"/)||[])[1];
+    const height=explicit||(isSectionBand(n)?sectionHeight:defaultHeight);
     if(!/\bht="[^"]*"/.test(row))row=row.replace(/>$/,' ht="'+height+'">');
     if(/\bcustomHeight="[^"]*"/.test(row))
       row=row.replace(/\bcustomHeight="[^"]*"/,'customHeight="1"');
@@ -489,7 +498,7 @@ function lockMasterRowHeights(outputXml,masterXml){
     return row;
   };
   outputXml=outputXml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>/g,(row,n)=>
-    fixedRowTag(masterRows.get(n)||row));
+    fixedRowTag(masterRows.get(n)||row,Number(n)));
   // The exporter must never change column geometry. Defensive restoration
   // makes custom-uploaded masters authoritative if another stage did so.
   const masterCols=(masterXml.match(/<cols\b[^>]*>[\s\S]*?<\/cols>/)||[])[0];
