@@ -1,4 +1,4 @@
-import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=20261017a";
+import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=20261019a";
 import {readWorkbookPreview} from "./floorplan-preview.js?v=20261017a";
 import {workbookDayPaths} from "./floorplan-sync.js?v=20261017a";
 import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261013b";
