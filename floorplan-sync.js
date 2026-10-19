@@ -74,9 +74,21 @@ function matchEvent(e,old){
 function pickRow(e,range,staffAreas,protectedEvents,reserved,preferred){
   const floor=Math.floor(range.start/100),part=(e.start&&e.end&&(Number(e.start.slice(0,2))>=16||Number(e.end.slice(0,2))>=19))?"PM":"AM";
   const top=({3:4,2:20,1:36}[floor])+(part==="PM"?5:0);
-  const count=preferred?.r2-preferred?.r1+1===2?2:3;
+  // Only a booking already occupying these EXACT bays in this same AM/PM
+  // section may retain its custom-height merged block. A full-height (4/5
+  // row) block is intentional in some uploaded weekly floorplans. Never
+  // generate that size for a new event or after changing bays/periods.
+  if(preferred&&preferred.c1===4+range.start%100&&preferred.c2===4+range.end%100&&
+     preferred.r1>=top&&preferred.r2<=top+4&&
+     !protectedEvents.some(x=>hit(x.area,preferred))&&
+     !reserved.some(x=>hit(x,preferred))){
+    return {...preferred};
+  }
+  const count=3; // Standard 3-high layout for genuinely new/moved bookings.
   const candidates=[];
-  if(preferred&&preferred.r1>=top&&preferred.r2<=top+4)candidates.push(preferred.r1);
+  // An old position is only a hint for newly laid-out cells, not license to
+  // retain its old size after a bay/period change.
+  if(preferred&&preferred.r1>=top&&preferred.r1+count-1<=top+4)candidates.push(preferred.r1);
   for(const row of count===2?[top,top+2,top+3,top+1]:[top,top+2,top+1])if(!candidates.includes(row))candidates.push(row);
   for(const row of candidates){
     if(row+count-1>top+4)continue;
