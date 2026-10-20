@@ -96,9 +96,15 @@ function mainMenu(products,staffProducts){
   if(food.some(p=>/Crowd Pleaser/i.test(p)))return {category:"Pleaser",package:"Pleaser"};
   const named=[
     [/Fajita Fiesta/i,"Fajita"],[/Ultimate Bites/i,"Ultimate"],[/Smokehouse BBQ/i,"Smokehouse"],
-    [/\bThe Premium\b/i,"Premium"],[/\bRise\s*&\s*Shine\b/i,"Rise & Shine"],
-    [/Most Valuable Buffet|\bMVB\b/i,"MVB"],[/Fairway Feast/i,"Fairway Feast"],
-    [/Breakfast Buffet/i,"Breakfast"],[/\bContinental\b/i,"Continental"]
+    [/\bThe Premium\b/i,"Premium"],[/Most Valuable Buffet|\bMVB\b/i,"MVB"],
+    [/\bTaste\s+of\s+(?:Topgolf|TG)\b/i,"Taste of TG"],
+    [/\bCantina(?:\s+Kitchen)?\b/i,"Cantina"],
+    [/\bFestive\s+Fare\b/i,"Festive Fare"],
+    [/\bChef(?:['’]?s)?\s+Table\b/i,"Chefs Table"],
+    [/\bModern\s+(?:Mediterranean|Med)\b/i,"Modern Med"],
+    [/\bRise\s*(?:&|and)\s*Shine\b/i,"Rise & Shine"],
+    [/\bContinental\b/i,"Continental"],
+    [/Fairway Feast/i,"Fairway Feast"],[/Breakfast Buffet/i,"Breakfast"]
   ];
   const packages=named.filter(([re])=>food.some(p=>re.test(p))).map(x=>x[1]);
   if(packages.length)return {category:"Buffet",package:packages.join(" + ")};

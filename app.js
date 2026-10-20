@@ -1,7 +1,7 @@
-import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=20261019c";
-import {readWorkbookPreview} from "./floorplan-preview.js?v=20261019c";
-import {workbookDayPaths} from "./floorplan-sync.js?v=20261019c";
-import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261013b";
+import {exportExactFloorPlan,buildExactFloorPlan} from "./excel-export.js?v=20261020a";
+import {readWorkbookPreview} from "./floorplan-preview.js?v=20261020a";
+import {workbookDayPaths} from "./floorplan-sync.js?v=20261020a";
+import {parseCsv,reportType,buildEvents} from "./csv-import.js?v=20261020a";
 import {extractSalesforceLinks,canonicalOpportunity,matchingSalesforceLink,linkForWorksheetText,safeSalesforceUrl} from "./salesforce-links.js?v=20261017a";
 let pdfjsLib=null;
 
@@ -99,7 +99,13 @@ function categoryAndPackage(text,booking,catering,name){
   const foods=[
     [/Fajita Fiesta/i,"Fajita"],[/Ultimate Bites/i,"Ultimate"],[/Smokehouse BBQ/i,"Smokehouse"],
     [/(?:The )?Premium/i,"Premium"],[/Most Valuable Buffet|The MVB\b/i,"MVB"],
-    [/Rise\s*&\s*Shine/i,"Rise & Shine"],[/Continental/i,"Continental"],
+    [/\bTaste\s+of\s+(?:Topgolf|TG)\b/i,"Taste of TG"],
+    [/\bCantina(?:\s+Kitchen)?\b/i,"Cantina"],
+    [/\bFestive\s+Fare\b/i,"Festive Fare"],
+    [/\bChef(?:['’]?s)?\s+Table\b/i,"Chefs Table"],
+    [/\bModern\s+(?:Mediterranean|Med)\b/i,"Modern Med"],
+    [/\bRise\s*(?:&|and)\s*Shine\b/i,"Rise & Shine"],
+    [/\bContinental\b/i,"Continental"],
     [/Fairway Feast/i,"Fairway Feast"],[/Breakfast Buffet/i,"Breakfast"],
     [/(?:Italian|Taco|BBQ|Buffet)\s*(?:Bar|Buffet|Menu|Package)/i,null]
   ];

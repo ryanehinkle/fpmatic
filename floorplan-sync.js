@@ -39,7 +39,10 @@ function parseExistingEvent(text){
   const lines=String(text||"").split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(lines.length<2||!lines.some(x=>/\b\d+\s*ppl\b/i.test(x)))return null;
   const guests=(text.match(/(\d+)\s*ppl\b/i)||[])[1];
-  const packageLine=lines.find(x=>/^(?:FX|Flex|Fajita|Smokehouse|Pleaser|Youth|Field Trip|Ultimate|Ult Bites|Premium|MVB|Buffet|Internal|Taster|Rise & Shine)$/i.test(x))||"";
+  // The same concise buffet labels as CSV/BEO import. Accept combinations
+  // when reading already-populated masters, so package changes are detected.
+  const packageNames=/^(?:FX|Flex|Fajita|Smokehouse|Pleaser|Youth|Field Trip|Ultimate|Ult Bites|Premium|MVB|Buffet|Internal|Taster|Fan Fave|Fairway Feast|Breakfast|Rise & Shine|Continental|Taste of TG|Cantina|Festive Fare|Chefs Table|Modern Med)$/i;
+  const packageLine=lines.find(x=>x.split(/\s+\+\s+/).every(part=>packageNames.test(part)))||"";
   const extra=lines.filter((x,i)=>i>0&&( /^(?:EAO|EA |EA:|EA Bar|EA Host|.*(?:HH\d+|online learning))/i.test(x)||/\b(?:EAO|EA Bar)\s*[-:]/i.test(x)));
   return {name:lines[0],guests:guests?+guests:null,package:packageLine,description:lines.slice(1),extra};
 }

@@ -34,6 +34,14 @@ assert(cell(y.xml,"O25").includes("40ppl"),"In-place guest update failed");
 assert(cell(y.xml,"O28").includes("Kelly"),"In-place update modified Kelly");
 assert.equal(workbookDayPaths('<sheets><sheet name="Monday 10.12" sheetId="1"/><sheet name="AM Monday 10.12" sheetId="2"/><sheet name="Tuesday 10.13" sheetId="3"/><sheet name="Tuesday 10.13 AM" sheetId="4"/><sheet name="Wednesday 10.14" sheetId="5"/><sheet name="Thursday 10.15" sheetId="7"/><sheet name="Friday 10.16" sheetId="9"/><sheet name="Saturday 10.17" sheetId="11"/><sheet name="Sunday 10.18" sheetId="12"/></sheets>')[4],"xl/worksheets/sheet9.xml");
 
+// Existing-floorplan readers must recognize every new label so updates can
+// preserve the event block and report a changed buffet correctly.
+const originalParser=vm.runInNewContext(source+"\nparseExistingEvent",{},{timeout:5000});
+for(const label of ["Taste of TG","Cantina","Festive Fare","Chefs Table","Modern Med","Rise & Shine","Continental","Cantina + Festive Fare"]){
+  const previous=originalParser("Sample Buffet\n5-7\n30ppl\n"+label);
+  assert.equal(previous.package,label,"Unrecognized pre-existing package "+label);
+}
+
 // Oversized custom event blocks in an uploaded floorplan are deliberate.
 // Preserve them ONLY while their bays and AM/PM section remain unchanged;
 // new/moved events still use the regular 3-row layout.

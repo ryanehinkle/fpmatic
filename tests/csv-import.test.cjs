@@ -50,4 +50,48 @@ const merged=buildEvents(parseCsv(staffingCsv+"\n"+more),menus);
 assert.equal(merged.events.length,6,"Only the Full Sig event should be added, not Tom's Lessons");
 assert.equal(merged.events.find(x=>x.name==="Full Rooms Event").space,"Full Sig");
 assert(!merged.events.some(x=>x.name==="Tom's Lessons"));
+// New buffet families, including names found in real Catering Menus exports.
+const buffetCases=[
+  ["Taste of Topgolf - Choose 6","Taste of TG"],
+  ["Taste of Topgolf -6 (Online)","Taste of TG"],
+  ["Taste of Topgolf - Choose 3","Taste of TG"],
+  ["Cantina Kitchen","Cantina"],
+  ["Cantina","Cantina"],
+  ["Festive Fare","Festive Fare"],
+  ["Chef's Table","Chefs Table"],
+  ["Chefs Table","Chefs Table"],
+  ["Modern Mediterranean","Modern Med"],
+  ["Modern Med","Modern Med"],
+  ["Rise & Shine","Rise & Shine"],
+  ["Rise and Shine Breakfast","Rise & Shine"],
+  ["Continental Breakfast","Continental"]
+];
+const quoteCsv=s=>'"'+String(s).replace(/"/g,'""')+'"';
+const staffBuffets=["Event Date,Event Start Time,Event End Time,Guest Count,Bay Numbers,Product Name,Opportunity Name"];
+const menuBuffets=["Event Start,Quantity,Product Name,Catering Location,Opportunity Name"];
+buffetCases.forEach(([product],i)=>{
+  const op="Buffet Demo "+i+" - Contact - 10.28.26";
+  staffBuffets.push(["10/28/2026","5:00 PM","7:00 PM",30,"229-232","Event Golf Bays",op].map(quoteCsv).join(","));
+  menuBuffets.push(["5:00 PM",30,product,"Behind bays",op].map(quoteCsv).join(","));
+  if(product==="Festive Fare")menuBuffets.push(["5:00 PM",30,"Gather Platter - serves 6","",op].map(quoteCsv).join(","));
+});
+const buffetResult=buildEvents(parseCsv(staffBuffets.join("\n")),parseCsv(menuBuffets.join("\n")));
+assert.equal(buffetResult.events.length,buffetCases.length);
+buffetCases.forEach(([product,label],i)=>{
+  const event=buffetResult.events.find(e=>e.name==="Buffet Demo "+i);
+  assert(event,"Missing import for "+product);
+  assert.equal(event.category,"Buffet",product+" incorrectly classified");
+  assert.equal(event.package,label,product+" label incorrect");
+  assert(!event.importFlags.includes("Review catering package"),product+" falsely flagged for Flex");
+});
+// PDF/BEO mode uses a different recognition function: keep both in sync.
+const beo=fs.readFileSync(path.join(__dirname,"..","app.js"),"utf8");
+const from=beo.indexOf("function categoryAndPackage("),to=beo.indexOf("function eventFromPages(",from);
+assert(from>=0&&to>from,"BEO buffet mapper not found");
+const beoMenu=vm.runInNewContext(beo.slice(from,to)+"\ncategoryAndPackage",{},{timeout:5000});
+buffetCases.forEach(([product,label])=>{
+  const event=beoMenu(product,"Corporate","","Sample Event");
+  assert.equal(event.category,"Buffet","PDF classification failed for "+product);
+  assert.equal(event.package,label,"PDF package label failed for "+product);
+});
 console.log("PASS — CSV joins, package colors, duplicate product rows, bay assignments, room/golf hours, tentative statuses, and missing-bay warnings.");

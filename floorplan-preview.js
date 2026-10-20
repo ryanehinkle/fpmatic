@@ -1,4 +1,4 @@
-import {workbookDayPaths,parseFloorplanCell,parseFloorplanShared} from "./floorplan-sync.js?v=20261019c";
+import {workbookDayPaths,parseFloorplanCell,parseFloorplanShared} from "./floorplan-sync.js?v=20261020a";
 
 const floors=[
   {number:3,am:4,pm:9},
