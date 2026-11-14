@@ -108,22 +108,44 @@ assert(merges(relocated.xml).includes("O20:P22"),"Unoccupied side strip should r
 assert(cell(relocated.xml,"O23").includes("Izack P 930"),"Staff name should move to the bottom section");
 assert(!cell(relocated.xml,"O20").includes("Izack P 930"),"Staff name still stranded in the narrow strip");
 
-// Blank unmerged bays should become a single rectangular section, but do not
-// merge across an existing dark divider or swallow an employee label.
+// Current Floorplan uploads can have individual empty bay squares with
+// events/staff already present, but NO pre-built blank staffing sections.
+// Do not manufacture large merged areas in those otherwise untouched cells.
 const emptyGrid='<worksheet><sheetData><row r="4"><c r="E4" s="1"/><c r="F4" s="1"/><c r="G4" s="1"/></row>'+
   '<row r="5"><c r="E5" s="1"/><c r="F5" s="1"/><c r="G5" s="1"/></row>'+
-  '</sheetData><mergeCells count="1"><mergeCell ref="H4:AL13"/></mergeCells></worksheet>';
-const blank=reconcileDay(emptyGrid,[],[],styles,display);
-assert(merges(blank.xml).includes("E4:G8"),"Blank AM bay section was not merged");
-assert(merges(blank.xml).includes("E9:G13"),"Blank PM bay section was not merged");
+  '</sheetData><mergeCells count="0"></mergeCells></worksheet>';
+const unsectioned=reconcileDay(emptyGrid,[],[],styles,display);
+assert.deepEqual(merges(unsectioned.xml),[],"Unsectioned uploaded floorplan merged blank squares");
+assert(cell(unsectioned.xml,"E4").includes('r="E4"'),"Empty source bay cell disappeared");
+const existingEvent='<worksheet><sheetData><row r="9"><c r="O9" s="2" t="inlineStr"><is>'+
+  '<t>Prior Event&#10;5-7&#10;10ppl&#10;Flex</t></is></c></row></sheetData>'+
+  '<mergeCells count="1"><mergeCell ref="O9:P11"/></mergeCells></worksheet>';
+const preserved=reconcileDay(existingEvent,[],[],styles,display);
+assert.deepEqual(merges(preserved.xml),["O9:P11"],"Existing events caused unrelated empty bays to merge");
+const newBooking={name:"New Event",bays:"301-302",start:"11:00",end:"13:00",
+  guests:12,package:"Flex",category:"Flex",status:"Definite"};
+const withNewBooking=reconcileDay(existingEvent,[],[newBooking],styles,display);
+assert(merges(withNewBooking.xml).includes("E4:F6"),"New booking wasn't merged to its required event block");
+assert(merges(withNewBooking.xml).includes("O9:P11"),"Unchanged existing event merge was altered");
+assert.equal(merges(withNewBooking.xml).length,2,"Added booking merged unrelated empty squares");
+
+// Previously laid-out blank sections can still be completed without crossing
+// an intentional dark divider, replacing a staff label, or merging AM into PM.
+const authored=emptyGrid.replace('<mergeCells count="0"></mergeCells>',
+  '<mergeCells count="2"><mergeCell ref="H4:AL8"/><mergeCell ref="H9:AL13"/></mergeCells>');
+const filled=reconcileDay(authored,[],[],styles,display);
+assert(merges(filled.xml).includes("E4:G8"),"Existing AM blank section was not completed");
+assert(merges(filled.xml).includes("E9:G13"),"Existing PM blank section was not completed");
 const dividerStyles={...styles,hardDivider:(a,b,direction)=>direction==="vertical"&&a===1&&b===2};
-const divided=emptyGrid.replace('<c r="G4" s="1"/>','<c r="G4" s="2"/>').replace('<c r="G5" s="1"/>','<c r="G5" s="2"/>');
+const divided=authored.replace('<c r="G4" s="1"/>','<c r="G4" s="2"/>')
+  .replace('<c r="G5" s="1"/>','<c r="G5" s="2"/>');
 const split=reconcileDay(divided,[],[],dividerStyles,display);
-assert(!merges(split.xml).some(m=>m==="E4:G8"),"Merged blank cells across a dark original divider");
-const labeled=emptyGrid.replace('<c r="F4" s="1"/>','<c r="F4" s="1" t="inlineStr"><is><t>Staff One</t></is></c>');
+assert(!merges(split.xml).includes("E4:G8"),"Merged across an original dark section divider");
+const labeled=authored.replace('<c r="F4" s="1"/>',
+  '<c r="F4" s="1" t="inlineStr"><is><t>Staff One</t></is></c>');
 const untouched=reconcileDay(labeled,[],[],styles,display);
-assert(cell(untouched.xml,"F4").includes("Staff One"),"Blank-area merging removed an employee label");
-assert(!merges(untouched.xml).some(m=>/^[A-Z]+\d+:[A-Z]+\d+$/.test(m)&&(()=>{const [a,b]=m.split(":");return a==="E4"&&b==="G8"})()),"Blank merge covered an employee");
+assert(cell(untouched.xml,"F4").includes("Staff One"),"Blank-area cleanup removed an employee label");
+assert(!merges(untouched.xml).includes("E4:G8"),"Blank-area cleanup covered an employee");
 
 // Real uploaded weekly masters have about 76,000 styled cells per day, most
 // outside the floorplan. Reconciliation must not process them as event cells.

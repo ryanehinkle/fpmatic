@@ -180,7 +180,12 @@ function relocateOriginalCell(cell,newAddress,newStyle){
   return tag;
 }
 
-function mergeUnoccupiedSections(existing,sourceCells,updatedCells,styles){
+function mergeUnoccupiedSections(existing,sourceCells,updatedCells,styles,authoredBands){
+  // A partially staffed/current floorplan is not permission to merge all its
+  // open bay cells. Only auto-complete a zone if the SOURCE already has an
+  // intentionally pre-merged blank section within that exact AM/PM band.
+  // Otherwise keep the original individual empty cells unchanged.
+  if(!authoredBands.size)return [];
   // A source floorplan can contain standalone grid cells where the event area
   // should be one blank merged section. Join only genuinely empty bay cells
   // inside each floor's AM or PM zone. Pre-existing merges and any populated
@@ -218,6 +223,7 @@ function mergeUnoccupiedSections(existing,sourceCells,updatedCells,styles){
   };
   const result=[];
   for(const [top,bottom] of EVENT_ROWS){
+    if(!authoredBands.has(top))continue;
     for(let row=top;row<=bottom;row++)for(let c=5;c<=38;c++){
       if(!free(c,row))continue;
       let best={c1:c,c2:c,r1:row,r2:row},maxArea=1;
@@ -246,9 +252,25 @@ function mergeUnoccupiedSections(existing,sourceCells,updatedCells,styles){
   }
   return result;
 }
+function authoredBlankBands(merges,cells){
+  const result=new Set();
+  for(const area of merges){
+    if(area.c1<5||area.c2>38)continue;
+    // Event areas that cross AM/PM are not intentional blank sections.
+    const zone=EVENT_ROWS.find(([top,bottom])=>area.r1>=top&&area.r2<=bottom);
+    if(!zone)continue;
+    const anchor=cells.get(col(area.c1)+area.r1);
+    if(anchor?.text?.trim())continue; // Staff/event sections aren't blank.
+    result.add(zone[0]);
+  }
+  return result;
+}
+
 export function reconcileDay(xml,shared,events,styles,displayLines){
   const cells=readCellNodes(xml,shared,true);
   const mergeNodes=[...xml.matchAll(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*\/>/g)].map(m=>areaFromRef(m[1]));
+  // Decide from the original workbook, before adding or moving any events.
+  const authoredBands=authoredBlankBands(mergeNodes,cells);
   const original=[];
   for(const m of mergeNodes){
     const address=col(m.c1)+m.r1,cell=cells.get(address);
@@ -313,10 +335,10 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
     }
     centerRemainingText(cells,alignment,styles);
     const resultXml=setCell(xml,alignment);
-    // No new event does not mean no cleanup: an uploaded week's empty
-    // sections should still be merged without touching its staffing.
+    // Only finish blank sections that were already explicitly prepared in
+    // the source. Untouched empty squares must remain individual cells.
     const finalMerges=mergeNodes.slice();
-    finalMerges.push(...mergeUnoccupiedSections(finalMerges,cells,alignment,styles));
+    finalMerges.push(...mergeUnoccupiedSections(finalMerges,cells,alignment,styles,authoredBands));
     const rebuilt=resultXml.replace(/<mergeCells\b([^>]*)>[\s\S]*?<\/mergeCells>/,block=>
       block.replace(/\bcount="\d+"/,'count="'+finalMerges.length+'"')
         .replace(/<mergeCell\b[^>]*\/>/g,"")
@@ -416,9 +438,9 @@ export function reconcileDay(xml,shared,events,styles,displayLines){
   }
   centerRemainingText(cells,updates,styles);
   xml=setCell(xml,updates);
-  // Finish any remaining blank, unmerged bay areas. The original section
-  // dividers remain boundaries, and staff/event text is never swallowed.
-  newMerges.push(...mergeUnoccupiedSections(newMerges,cells,updates,styles));
+  // Complete only pre-authored empty sections. Never convert a week of
+  // individual blank squares into one giant merged floorplan section.
+  newMerges.push(...mergeUnoccupiedSections(newMerges,cells,updates,styles,authoredBands));
   const unique=[...new Map(newMerges.map(m=>[ref(m),m])).values()];
   // Excel cannot safely display overlapping merged cells. Fail the preview
   // and export rather than silently corrupting the uploaded weekly floorplan.
