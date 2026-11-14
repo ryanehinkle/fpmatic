@@ -116,7 +116,7 @@ const emptyGrid='<worksheet><sheetData><row r="4"><c r="E4" s="1"/><c r="F4" s="
   '</sheetData><mergeCells count="0"></mergeCells></worksheet>';
 const unsectioned=reconcileDay(emptyGrid,[],[],styles,display);
 assert.deepEqual(merges(unsectioned.xml),[],"Unsectioned uploaded floorplan merged blank squares");
-assert(cell(unsectioned.xml,"E4").includes('r="E4"'),"Empty source bay cell disappeared");
+assert(/<c\s+r="E4"\s+s="1"\s*\/>/.test(unsectioned.xml),"Empty source bay cell disappeared");
 const existingEvent='<worksheet><sheetData><row r="9"><c r="O9" s="2" t="inlineStr"><is>'+
   '<t>Prior Event&#10;5-7&#10;10ppl&#10;Flex</t></is></c></row></sheetData>'+
   '<mergeCells count="1"><mergeCell ref="O9:P11"/></mergeCells></worksheet>';
